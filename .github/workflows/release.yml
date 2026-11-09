@@ -1,0 +1,26 @@
+name: Package and release
+
+# Push a tag like v1.0.0 to build the zip, create a GitHub release and
+# upload it to CurseForge (needs the CF_API_KEY repository secret and the
+# X-Curse-Project-ID line in BuffTracker.toc).
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Package and upload
+        uses: BigWigsMods/packager@v2

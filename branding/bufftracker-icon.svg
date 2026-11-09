@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+  <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+    <stop offset="0" stop-color="#2e2652"/>
+    <stop offset="0.55" stop-color="#191430"/>
+    <stop offset="1" stop-color="#090713"/>
+  </radialGradient>
+  <radialGradient id="arcane" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="#3fe0c0" stop-opacity="0.35"/>
+    <stop offset="0.5" stop-color="#6a4bd8" stop-opacity="0.18"/>
+    <stop offset="1" stop-color="#6a4bd8" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="hexFill" cx="50%" cy="35%" r="70%">
+    <stop offset="0" stop-color="#2a2150"/>
+    <stop offset="1" stop-color="#0d0a1c"/>
+  </radialGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff2c0"/>
+    <stop offset="0.3" stop-color="#f7cc55"/>
+    <stop offset="0.7" stop-color="#c88a1e"/>
+    <stop offset="1" stop-color="#8a5a0c"/>
+  </linearGradient>
+  <linearGradient id="goldDiag" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff2c0"/>
+    <stop offset="0.45" stop-color="#e6ad3a"/>
+    <stop offset="1" stop-color="#7a4d08"/>
+  </linearGradient>
+  <linearGradient id="goldSide" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#8a5a0c"/>
+    <stop offset="0.3" stop-color="#e9b43c"/>
+    <stop offset="0.55" stop-color="#ffe08a"/>
+    <stop offset="1" stop-color="#9a650f"/>
+  </linearGradient>
+  <linearGradient id="goldTop" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff4c9"/>
+    <stop offset="1" stop-color="#e0a53a"/>
+  </linearGradient>
+  <linearGradient id="gem" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#d4fff5"/>
+    <stop offset="0.45" stop-color="#2fd6a8"/>
+    <stop offset="1" stop-color="#075640"/>
+  </linearGradient>
+  <linearGradient id="ruby" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ffd0d6"/>
+    <stop offset="0.45" stop-color="#e0304e"/>
+    <stop offset="1" stop-color="#5c0816"/>
+  </linearGradient>
+  <filter id="stone" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="4" seed="7" result="n"/>
+    <feColorMatrix in="n" type="matrix"
+      values="0 0 0 0 0.75  0 0 0 0 0.7  0 0 0 0 1  0 0 0 0.9 -0.35"/>
+  </filter>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="9" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#000" flood-opacity="0.6"/>
+  </filter>
+  <clipPath id="tClip"><path d="M146 168 Q150 160 160 160 H352 Q362 160 366 168 L346 212 H286 V362 L256 404 L226 362 V212 H166 Z"/></clipPath>
+  <clipPath id="frameClip"><rect width="512" height="512" rx="30"/></clipPath>
+  <radialGradient id="buffTile" cx="50%" cy="40%" r="75%">
+    <stop offset="0" stop-color="#9dffe6"/>
+    <stop offset="0.45" stop-color="#1fb48c"/>
+    <stop offset="1" stop-color="#06392c"/>
+  </radialGradient></defs>
+  <g clip-path="url(#frameClip)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <rect width="512" height="512" filter="url(#stone)" opacity="0.18"/>
+    <circle cx="256" cy="256" r="250" fill="url(#arcane)" opacity="0.7"/>
+    <g fill="none" stroke="#f6c94f" stroke-width="1.98" stroke-linecap="round"
+    stroke-linejoin="round" opacity="0.28" filter="url(#softGlow)"><path d="M0 -9 V9 M0 -3 L6 -9 M0 3 L6 -3" transform="translate(256 80) rotate(0) scale(0.9)"/><path d="M-4 -9 V9 M4 -9 V9 M-4 -3 L4 3" transform="translate(300.5 85.01) rotate(12.86) scale(0.9)"/><path d="M0 -9 V9 M0 -9 L-6 -3 M0 -9 L6 -3" transform="translate(342.78 99.81) rotate(25.71) scale(0.9)"/><path d="M0 -9 V9 M-6 -5 L0 1 L6 -5" transform="translate(380.7 123.63) rotate(38.57) scale(0.9)"/><path d="M0 -9 L6 0 L0 9 L-6 0 Z" transform="translate(412.37 155.3) rotate(51.43) scale(0.9)"/><path d="M-3 -9 V9 M-3 -4 L4 0 L-3 4" transform="translate(436.19 193.22) rotate(64.29) scale(0.9)"/><path d="M-3 9 V-9 L4 -4 L-3 1 L4 6" transform="translate(450.99 235.5) rotate(77.14) scale(0.9)"/><path d="M-5 -9 L5 9 M5 -9 L-5 9" transform="translate(456 280) rotate(90) scale(0.9)"/><path d="M0 -9 V9 M0 -3 L6 -9 M0 3 L6 -3" transform="translate(450.99 324.5) rotate(102.86) scale(0.9)"/><path d="M-4 -9 V9 M4 -9 V9 M-4 -3 L4 3" transform="translate(436.19 366.78) rotate(115.71) scale(0.9)"/><path d="M0 -9 V9 M0 -9 L-6 -3 M0 -9 L6 -3" transform="translate(412.37 404.7) rotate(128.57) scale(0.9)"/><path d="M0 -9 V9 M-6 -5 L0 1 L6 -5" transform="translate(380.7 436.37) rotate(141.43) scale(0.9)"/><path d="M0 -9 L6 0 L0 9 L-6 0 Z" transform="translate(342.78 460.19) rotate(154.29) scale(0.9)"/><path d="M-3 -9 V9 M-3 -4 L4 0 L-3 4" transform="translate(300.5 474.99) rotate(167.14) scale(0.9)"/><path d="M-3 9 V-9 L4 -4 L-3 1 L4 6" transform="translate(256 480) rotate(180) scale(0.9)"/><path d="M-5 -9 L5 9 M5 -9 L-5 9" transform="translate(211.5 474.99) rotate(192.86) scale(0.9)"/><path d="M0 -9 V9 M0 -3 L6 -9 M0 3 L6 -3" transform="translate(169.22 460.19) rotate(205.71) scale(0.9)"/><path d="M-4 -9 V9 M4 -9 V9 M-4 -3 L4 3" transform="translate(131.3 436.37) rotate(218.57) scale(0.9)"/><path d="M0 -9 V9 M0 -9 L-6 -3 M0 -9 L6 -3" transform="translate(99.63 404.7) rotate(231.43) scale(0.9)"/><path d="M0 -9 V9 M-6 -5 L0 1 L6 -5" transform="translate(75.81 366.78) rotate(244.29) scale(0.9)"/><path d="M0 -9 L6 0 L0 9 L-6 0 Z" transform="translate(61.01 324.5) rotate(257.14) scale(0.9)"/><path d="M-3 -9 V9 M-3 -4 L4 0 L-3 4" transform="translate(56 280) rotate(270) scale(0.9)"/><path d="M-3 9 V-9 L4 -4 L-3 1 L4 6" transform="translate(61.01 235.5) rotate(282.86) scale(0.9)"/><path d="M-5 -9 L5 9 M5 -9 L-5 9" transform="translate(75.81 193.22) rotate(295.71) scale(0.9)"/><path d="M0 -9 V9 M0 -3 L6 -9 M0 3 L6 -3" transform="translate(99.63 155.3) rotate(308.57) scale(0.9)"/><path d="M-4 -9 V9 M4 -9 V9 M-4 -3 L4 3" transform="translate(131.3 123.63) rotate(321.43) scale(0.9)"/><path d="M0 -9 V9 M0 -9 L-6 -3 M0 -9 L6 -3" transform="translate(169.22 99.81) rotate(334.29) scale(0.9)"/><path d="M0 -9 V9 M-6 -5 L0 1 L6 -5" transform="translate(211.5 85.01) rotate(347.14) scale(0.9)"/></g><circle cx="256" cy="280" r="214.4" fill="none" stroke="#f6c94f" stroke-opacity="0.45" stroke-width="2.25"/><circle cx="256" cy="280" r="185.6" fill="none" stroke="#f6c94f" stroke-opacity="0.45" stroke-width="2.25"/>
+    <clipPath id="tileClip"><rect x="146" y="150" width="300" height="300" rx="26"/></clipPath>
+  <g filter="url(#shadow)">
+    <rect x="146" y="150" width="300" height="300" rx="26" fill="url(#buffTile)"/>
+  </g>
+  <g filter="url(#softGlow)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200 290 L296 206 L392 290" stroke="#3d2604" stroke-width="44"/>
+    <path d="M200 290 L296 206 L392 290" stroke="url(#gold)" stroke-width="30"/>
+    <path d="M200 390 L296 306 L392 390" stroke="#3d2604" stroke-width="44"/>
+    <path d="M200 390 L296 306 L392 390" stroke="url(#gold)" stroke-width="30"/>
+  </g>
+  <g clip-path="url(#tileClip)">
+    <path d="M296 300 L296 0
+      A300 300 0 1 0 555.81 450 Z" fill="#04060c" opacity="0.5"/>
+  </g>
+  <rect x="146" y="150" width="300" height="300" rx="26" fill="none" stroke="url(#gold)" stroke-width="14"/>
+  <rect x="138" y="142" width="316" height="316" rx="32" fill="none" stroke="#3d2604" stroke-width="3"/>
+    <path d="M430 114 L432.2 121.8 L440 124 L432.2 126.2 L430 134
+    L427.8 126.2 L420 124 L427.8 121.8 Z" fill="#fff8dc" opacity="0.9"/><path d="M124 432 L125.76 438.24 L132 440 L125.76 441.76 L124 448
+    L122.24 441.76 L116 440 L122.24 438.24 Z" fill="#d4fff5" opacity="0.8"/>
+  </g>
+  <rect x="12" y="12" width="488" height="488" rx="26" fill="none" stroke="url(#gold)" stroke-width="16"/>
+    <rect x="4" y="4" width="504" height="504" rx="30" fill="none" stroke="#3d2604" stroke-width="3"/>
+    <rect x="21" y="21" width="470" height="470" rx="20" fill="none" stroke="#3d2604" stroke-width="3"/>
+    <rect x="30" y="30" width="452" height="452" rx="16" fill="none" stroke="#f6c94f" stroke-opacity="0.35" stroke-width="2.5"/><polygon points="488,2 510,24 488,46 466,24" fill="url(#goldDiag)"
+      stroke="#3d2604" stroke-width="3"/><circle cx="488" cy="24" r="11" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="488" cy="24" r="7" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="485.55" cy="21.55" r="2.1" fill="#fff" opacity="0.8"/><polygon points="24,466 46,488 24,510 2,488" fill="url(#goldDiag)"
+      stroke="#3d2604" stroke-width="3"/><circle cx="24" cy="488" r="11" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="24" cy="488" r="7" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="21.55" cy="485.55" r="2.1" fill="#fff" opacity="0.8"/><polygon points="488,466 510,488 488,510 466,488" fill="url(#goldDiag)"
+      stroke="#3d2604" stroke-width="3"/><circle cx="488" cy="488" r="11" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="488" cy="488" r="7" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="485.55" cy="485.55" r="2.1" fill="#fff" opacity="0.8"/><circle cx="128" cy="20" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="128" cy="492" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="20" cy="128" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="492" cy="128" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="256" cy="20" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="256" cy="492" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="20" cy="256" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="492" cy="256" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="384" cy="20" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="384" cy="492" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="20" cy="384" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="492" cy="384" r="4" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/>
+  <g transform="translate(104 104) scale(0.42) translate(-256 -256)" filter="url(#shadow)">
+    <polygon points="256,70 417.08,163 417.08,349 256,442 94.92,349 94.92,163" fill="url(#hexFill)" stroke="url(#gold)" stroke-width="20"
+    stroke-linejoin="round" filter="url(#shadow)"/><polygon points="256,70 417.08,163 417.08,349 256,442 94.92,349 94.92,163" fill="none" stroke="#3d2604" stroke-width="2.5" stroke-linejoin="round"/><polygon points="256,92 398.03,174 398.03,338 256,420 113.97,338 113.97,174" fill="none" stroke="#3d2604" stroke-width="3" stroke-linejoin="round"/><polygon points="256,106 385.9,181 385.9,331 256,406 126.1,331 126.1,181" fill="none" stroke="#f6c94f" stroke-opacity="0.45" stroke-width="2.5"
+    stroke-linejoin="round"/><circle cx="256" cy="262" r="120" fill="url(#arcane)"/><circle cx="336.54" cy="116.5" r="4.5" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="417.08" cy="256" r="4.5" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="336.54" cy="395.5" r="4.5" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="175.46" cy="395.5" r="4.5" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="94.92" cy="256" r="4.5" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="175.46" cy="116.5" r="4.5" fill="#fff0b8" stroke="#5c3b07" stroke-width="2"/><circle cx="417.08" cy="163" r="13" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="417.08" cy="163" r="9" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="413.93" cy="159.85" r="2.6999999999999997" fill="#fff" opacity="0.8"/><circle cx="417.08" cy="349" r="13" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="417.08" cy="349" r="9" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="413.93" cy="345.85" r="2.6999999999999997" fill="#fff" opacity="0.8"/><circle cx="256" cy="442" r="13" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="256" cy="442" r="9" fill="url(#ruby)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="252.85" cy="438.85" r="2.6999999999999997" fill="#fff" opacity="0.8"/><circle cx="94.92" cy="349" r="13" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="94.92" cy="349" r="9" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="91.77" cy="345.85" r="2.6999999999999997" fill="#fff" opacity="0.8"/><circle cx="94.92" cy="163" r="13" fill="url(#goldDiag)" stroke="#3d2604" stroke-width="2.5"/>
+    <circle cx="94.92" cy="163" r="9" fill="url(#gem)" stroke="#03261c" stroke-width="1.5"/>
+    <circle cx="91.77" cy="159.85" r="2.6999999999999997" fill="#fff" opacity="0.8"/><g filter="url(#shadow)">
+    <path d="M146 168 Q150 160 160 160 H352 Q362 160 366 168 L346 212 H286 V362 L256 404 L226 362 V212 H166 Z" fill="url(#gold)"/>
+    <g clip-path="url(#tClip)">
+      <polygon points="120,140 400,140 120,420" fill="#fff6d6" opacity="0.12"/>
+      <rect x="140" y="160" width="240" height="10" fill="#fff6d6" opacity="0.35"/>
+    </g>
+    <path d="M146 168 Q150 160 160 160 H352 Q362 160 366 168 L346 212 H286 V362 L256 404 L226 362 V212 H166 Z" fill="none" stroke="#4a2f05" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M256 228 V380" stroke="#6b4508" stroke-width="7" stroke-linecap="round"/>
+    <path d="M253 228 V378" stroke="#fff6d2" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/>
+  </g><g filter="url(#glow)">
+    <polygon points="256,52 276,70 256,92 236,70" fill="url(#gem)" stroke="#3d2604" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="256,160 281,186 256,212 231,186" fill="url(#gem)" stroke="#03261c" stroke-width="4" stroke-linejoin="round"/>
+  </g><polygon points="256,166 270,180 256,186 242,180" fill="#fff" opacity="0.55"/>
+  </g>
+</svg>
