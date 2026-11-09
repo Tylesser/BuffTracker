@@ -9,6 +9,7 @@
 ## X-Curse-Project-ID: 1794588
 ## X-Website: https://github.com/Tylesser/BuffTracker
 
+Tylesser.lua
 Core.lua
 Display.lua
 Party.lua

@@ -5,7 +5,7 @@ local _, ns = ...
 -- change them in combat, so all of that happens out of combat. In combat they keep working as
 -- they were, and a buff that lands on the member only dims its button.
 
-local SIZE = 22
+local SIZE = 24
 local GAP = 2
 local MAX_PER_UNIT = 4
 local SOON_SECONDS = 60
@@ -320,12 +320,13 @@ local function CreateButton()
   end
   button:SetAttribute("type", "spell")
 
-  button.border = button:CreateTexture(nil, "BACKGROUND")
-  button.border:SetAllPoints()
-  button.border:SetColorTexture(0.9, 0.1, 0.1, 1)
+  local backdrop = button:CreateTexture(nil, "BACKGROUND")
+  backdrop:SetAllPoints()
+  backdrop:SetColorTexture(0, 0, 0, 1)
+  button.border = ns.T.DoubleBorder(button)
   button.icon = button:CreateTexture(nil, "ARTWORK")
-  button.icon:SetPoint("TOPLEFT", 1, -1)
-  button.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+  button.icon:SetPoint("TOPLEFT", 3, -3)
+  button.icon:SetPoint("BOTTOMRIGHT", -3, 3)
   button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 
@@ -369,10 +370,10 @@ local function UpdateLooks()
         button.icon:SetDesaturated(done or false)
         if done then
           button:SetAlpha(0.4)
-          button.border:SetColorTexture(0.3, 0.3, 0.3, 1)
+          ns.T.SetBorderColor(button.border, ns.T.GREY)
         else
           button:SetAlpha(1)
-          button.border:SetColorTexture(0.9, 0.1, 0.1, 1)
+          ns.T.SetBorderColor(button.border, ns.T.GOLD_DEEP)
         end
         if not reachable then
           button.icon:SetVertexColor(1, 0.3, 0.3)

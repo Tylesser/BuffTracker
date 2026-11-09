@@ -7,7 +7,7 @@ local WARN_SECONDS = 60
 local RESCAN_SECONDS = 1
 local TOP_OFFSET = 44 -- default position: the row's center, below the top edge of the screen
 
-local anchor, anchorLabel, anchorBackground
+local anchor, anchorLabel, mover
 local icons = {}
 
 local function FormatTime(seconds)
@@ -49,14 +49,17 @@ function ns.CreateDisplay()
     ApplyPosition()
   end)
 
-  anchorBackground = anchor:CreateTexture(nil, "BACKGROUND")
-  anchorBackground:SetPoint("TOPLEFT", -6, 6)
-  anchorBackground:SetPoint("BOTTOMRIGHT", 6, -20)
-  anchorBackground:SetColorTexture(0.1, 0.5, 0.9, 0.35)
+  -- Shown while unlocked: a stone plate behind the row and a label above it.
+  mover = CreateFrame("Frame", nil, anchor)
+  mover:SetPoint("TOPLEFT", -10, 10)
+  mover:SetPoint("BOTTOMRIGHT", 10, -24)
+  mover:SetFrameLevel(math.max(anchor:GetFrameLevel() - 1, 0))
+  ns.T.Stone(mover, 12)
 
-  anchorLabel = anchor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  anchorLabel:SetPoint("BOTTOM", anchor, "TOP", 0, 10)
-  anchorLabel:SetText("Buff Tracker: drag to move")
+  anchorLabel = mover:CreateFontString(nil, "OVERLAY")
+  ns.T.Font(anchorLabel, 11)
+  anchorLabel:SetPoint("BOTTOM", mover, "TOP", 0, 6)
+  anchorLabel:SetText("BUFF TRACKER: DRAG TO MOVE")
 
   ApplyPosition()
 end
@@ -67,11 +70,15 @@ local function GetIcon(index)
     return icon
   end
   icon = CreateFrame("Frame", nil, anchor)
-  icon.border = icon:CreateTexture(nil, "BACKGROUND")
-  icon.border:SetAllPoints()
+  icon.backdrop = icon:CreateTexture(nil, "BACKGROUND")
+  icon.backdrop:SetAllPoints()
+  icon.backdrop:SetColorTexture(0, 0, 0, 1)
+  icon.border = ns.T.DoubleBorder(icon)
+  icon.stud = ns.T.Stud(icon, 12, true)
+  icon.stud:SetPoint("CENTER", icon, "TOPRIGHT", -1, -1)
   icon.texture = icon:CreateTexture(nil, "ARTWORK")
-  icon.texture:SetPoint("TOPLEFT", 2, -2)
-  icon.texture:SetPoint("BOTTOMRIGHT", -2, 2)
+  icon.texture:SetPoint("TOPLEFT", 3, -3)
+  icon.texture:SetPoint("BOTTOMRIGHT", -3, 3)
   icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   icon.count = icon:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   icon.count:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -137,15 +144,16 @@ function ns.UpdateDisplay()
     icon.state = state
     icon.texture:SetTexture(entry.icon or ns.DEFAULT_ICON)
     icon.texture:SetDesaturated(not active)
+    -- Missing: ruby border and a ruby stud. Active: gold. Not read yet (may or may not be on): grey.
+    icon.stud:SetShown(missing or false)
     if missing then
-      icon.border:SetColorTexture(0.9, 0.1, 0.1, 1)
+      ns.T.SetBorderColor(icon.border, ns.T.RUBY)
       icon.texture:SetVertexColor(1, 0.5, 0.5)
     elseif active then
-      icon.border:SetColorTexture(0, 0, 0, 1)
+      ns.T.SetBorderColor(icon.border, ns.T.GOLD_DEEP)
       icon.texture:SetVertexColor(1, 1, 1)
     else
-      -- Not read yet, so it may or may not be on.
-      icon.border:SetColorTexture(0.3, 0.3, 0.3, 1)
+      ns.T.SetBorderColor(icon.border, ns.T.GREY)
       icon.texture:SetVertexColor(0.7, 0.7, 0.7)
     end
     local count = active and state.count or 0
@@ -160,8 +168,7 @@ function ns.UpdateDisplay()
 
   local unlocked = not ns.db.locked
   anchor:EnableMouse(unlocked)
-  anchorBackground:SetShown(unlocked)
-  anchorLabel:SetShown(unlocked)
+  mover:SetShown(unlocked)
 end
 
 -- Runs a few times per second: counts down, and checks again while the game hides buffs. A timer

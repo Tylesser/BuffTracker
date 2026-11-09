@@ -3,6 +3,7 @@
 ## 1.0.0
 
 - First version.
+- The Tylesser look shared by all Tylesser addons: stone and gold options pages, and icons and party buttons with gold borders (ruby when a buff is missing).
 - Choose the buffs to track from the buffs on you or your spellbook, or by typing a name or spell ID.
 - A row of icons at the top of the screen, which you can move, with time left and stacks. Each buff shows only when missing (the default), only when active, or always.
 - The tracked list, position and icon size are saved per character.

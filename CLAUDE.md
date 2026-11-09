@@ -4,6 +4,9 @@ Shared conventions, release steps and the game client are in the workspace file 
 
 ## Files (load order from BuffTracker.toc)
 
+- `Tylesser.lua`: the shared Tylesser "Runestone" look (`ns.T`: stone panels, gold borders, studs, Cinzel, buttons,
+  check boxes, options page header, chat prefix). Loaded first. The same file is in every Tylesser addon: edit them together
+  (see the workspace CLAUDE.md).
 - `Core.lua`: defaults for `BuffTrackerDB` (`SavedVariablesPerCharacter`: `tracked`, `locked`, `iconSize`, and `x`, `y` once the row has been moved; before that it sits at the top center of the screen), reading
   the player's buffs, `ns.state` per lowercase buff name, adding and removing buffs, and the spellbook list for the
   options page. A tracked entry is `{ name, icon, mode }`, where mode is `always`, `active` or `missing`.

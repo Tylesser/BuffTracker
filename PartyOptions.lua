@@ -4,7 +4,9 @@ local _, ns = ...
 -- Left: the group buffs you know, each with an on/off box. Right (paladins): blessing per class,
 -- and per party member.
 
-local ROW_HEIGHT = 26
+local ROW_HEIGHT = 24
+local HEADING_Y = -180 -- below the page header (ns.T.OPTIONS_TOP) and the two check boxes
+local LIST_Y = HEADING_Y - 22
 local LEFT_X, LEFT_WIDTH = 16, 290
 local RIGHT_X, RIGHT_WIDTH = 330, 250
 local CYCLE_WIDTH = 96
@@ -20,16 +22,7 @@ local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
 local function CheckBox(parent, label)
-  local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-  local text = check.Text or check.text
-  if not text then
-    text = check:CreateFontString(nil, "OVERLAY")
-    text:SetPoint("LEFT", check, "RIGHT", 2, 0)
-  end
-  text:SetFontObject("GameFontHighlight")
-  text:SetText(label)
-  check.label = text
-  return check
+  return ns.T.Check(parent, label)
 end
 
 local function ColoredClass(class, text)
@@ -81,9 +74,7 @@ local function NextBlessing(current, withClassOption)
 end
 
 local function CycleButton(parent)
-  local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-  button:SetSize(CYCLE_WIDTH, 22)
-  return button
+  return ns.T.Button(parent, CYCLE_WIDTH, 22)
 end
 
 local function GetBuffRow(index)
@@ -93,8 +84,8 @@ local function GetBuffRow(index)
   end
   row = CreateFrame("Frame", nil, panel)
   row:SetSize(LEFT_WIDTH, ROW_HEIGHT * 1.5)
-  row:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, -160 - (index - 1) * ROW_HEIGHT * 1.6)
-  row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+  row:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, LIST_Y - (index - 1) * ROW_HEIGHT * 1.6)
+  row.check = ns.T.Check(row)
   row.check:SetPoint("TOPLEFT", -2, 2)
   row.check:SetScript("OnClick", function(self)
     ns.db.party.off[self:GetParent().family.key] = not self:GetChecked() or nil
@@ -159,7 +150,7 @@ local function GetClassRow(index)
   end
   row = CreateFrame("Frame", nil, panel)
   row:SetSize(RIGHT_WIDTH, ROW_HEIGHT)
-  row:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, -160 - (index - 1) * ROW_HEIGHT)
+  row:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, LIST_Y - (index - 1) * ROW_HEIGHT)
   row.button = CycleButton(row)
   row.button:SetPoint("RIGHT", 0, 0)
   row.button:SetScript("OnClick", function(self)
@@ -212,7 +203,7 @@ local function RefreshBlessings()
     row:SetShown(known)
   end
   memberTitle:ClearAllPoints()
-  memberTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, -160 - #CLASSES * ROW_HEIGHT - 12)
+  memberTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, LIST_Y - #CLASSES * ROW_HEIGHT - 10)
 
   local used = 0
   if known then
@@ -258,19 +249,11 @@ function ns.CreatePartyOptions()
   panel.name = "Party buffs"
   panel.parent = ns.TITLE
 
-  local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOPLEFT", 16, -16)
-  title:SetText("Party buffs")
-
-  local subtitle = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-  subtitle:SetWidth(560)
-  subtitle:SetJustifyH("LEFT")
-  subtitle:SetText("Buttons next to your party frames for buffs a member is missing. Click one to cast it on them. "
+  ns.T.OptionsPage(panel, "Party buffs", "Buttons next to your party frames for buffs a member is missing. Click one to cast it on them. "
     .. "Buttons can't appear or move during combat, so they update when combat ends.")
 
   enabledCheck = CheckBox(panel, "Show buff buttons next to party frames")
-  enabledCheck:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -2, -8)
+  enabledCheck:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X - 2, ns.T.OPTIONS_TOP)
   enabledCheck:SetScript("OnClick", function(self)
     ns.db.party.enabled = self:GetChecked() and true or false
     ns.PartyChanged()
@@ -283,9 +266,8 @@ function ns.CreatePartyOptions()
     ns.PartyChanged()
   end)
 
-  local buffTitle = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  buffTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, -140)
-  buffTitle:SetText("Your group buffs")
+  local buffTitle = ns.T.Heading(panel, "Your group buffs", LEFT_WIDTH)
+  buffTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, HEADING_Y)
 
   buffEmpty = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   buffEmpty:SetPoint("TOPLEFT", buffTitle, "BOTTOMLEFT", 0, -8)
@@ -295,15 +277,14 @@ function ns.CreatePartyOptions()
     .. "Shadow Protection, Mark of the Wild).")
 
   local note = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  note:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, -160 - #ns.GROUP_BUFFS * ROW_HEIGHT * 1.6 - 8)
+  note:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, LIST_Y - #ns.GROUP_BUFFS * ROW_HEIGHT * 1.6 - 8)
   note:SetWidth(LEFT_WIDTH)
   note:SetJustifyH("LEFT")
   note:SetText("The group spell is used when you can cast it. Without its reagent, the button casts the "
     .. "single-target spell instead.")
 
-  blessingTitle = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  blessingTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, -140)
-  blessingTitle:SetText("Blessings by class")
+  blessingTitle = ns.T.Heading(panel, "Blessings by class", RIGHT_WIDTH)
+  blessingTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, HEADING_Y)
 
   blessingEmpty = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   blessingEmpty:SetPoint("TOPLEFT", blessingTitle, "BOTTOMLEFT", 0, -8)
@@ -311,8 +292,7 @@ function ns.CreatePartyOptions()
   blessingEmpty:SetJustifyH("LEFT")
   blessingEmpty:SetText("For paladins: choose a blessing for each class and party member.")
 
-  memberTitle = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  memberTitle:SetText("Party members")
+  memberTitle = ns.T.Heading(panel, "Party members", RIGHT_WIDTH)
 
   memberEmpty = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   memberEmpty:SetPoint("TOPLEFT", memberTitle, "BOTTOMLEFT", 0, -4 - ROW_HEIGHT)

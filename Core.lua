@@ -1,7 +1,7 @@
 local _, ns = ...
 
 ns.TITLE = "Tylesser - Buff Tracker"
-ns.PREFIX = "|cffffd700Tylesser - Buff Tracker|r: "
+ns.PREFIX = ns.T.Prefix("Buff Tracker")
 ns.DEFAULT_ICON = 134400 -- question mark
 
 ns.defaults = {
