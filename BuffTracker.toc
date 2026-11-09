@@ -6,6 +6,7 @@
 ## SavedVariablesPerCharacter: BuffTrackerDB
 ## IconTexture: Interface\AddOns\BuffTracker\Media\Icon
 ## X-License: MIT
+## X-Curse-Project-ID: 1794588
 ## X-Website: https://github.com/Tylesser/BuffTracker
 
 Core.lua

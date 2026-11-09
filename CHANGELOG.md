@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0
 
 - First version.
 - Choose the buffs to track from the buffs on you or your spellbook, or by typing a name or spell ID.

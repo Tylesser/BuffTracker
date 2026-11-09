@@ -16,7 +16,7 @@ Shared conventions, release steps and the game client are in the workspace file 
   `enabled`, `soon`, `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win).
 - `Options.lua`: canvas page in Blizzard's settings: tracked buffs on the left, buffs and spells to add on the right.
 - `PartyOptions.lua`: "Party buffs" sub-page: group buff on/off boxes, blessing per class and per party member
-  (cycle buttons, no dropdowns). Not yet tested in game (2026-11-09).
+  (cycle buttons, no dropdowns).
 - `Events.lua`: `ADDON_LOADED` setup, `UNIT_AURA` updates, the 0.2 second tick and the slash commands `/btrack` and
   `/bufftracker`.
 
