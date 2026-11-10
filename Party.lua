@@ -22,9 +22,58 @@ ns.DEFAULT_REFRESH_SECONDS = 60
 
 function ns.FormatSeconds(seconds)
   if seconds >= 60 and seconds % 60 == 0 then
-    return (seconds / 60) .. " min"
+    return string.format("%d min", seconds / 60)
   end
   return seconds .. " sec"
+end
+
+-- "Hide when farther than": the choices, in yards.
+ns.RANGE_CHOICES = { 30, 40, 60, 80, 100 }
+ns.DEFAULT_RANGE_YARDS = 60
+local SIGHT_YARDS = 100 -- about how far the game shows other players: farther, UnitIsVisible is false
+local UNIT_IN_RANGE_YARDS = 40 -- about what UnitInRange checks
+
+-- Yards between you and the unit, or nil when the game doesn't tell (in instances, on another
+-- map, or when positions are hidden from addons).
+local function Distance(unit)
+  if not UnitPosition then
+    return nil
+  end
+  local ok, distance = pcall(function()
+    local y1, x1, _, map1 = UnitPosition("player")
+    local y2, x2, _, map2 = UnitPosition(unit)
+    if not (y1 and y2) or map1 ~= map2 then
+      return nil
+    end
+    return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+  end)
+  return ok and distance or nil
+end
+
+-- Whether the unit is past the distance limit. Without a position the game only tells whether
+-- they're out of sight (about 100 yards) or out of UnitInRange (about 40 yards), so a member is
+-- hidden only when one of those proves they're too far.
+local function TooFar(unit)
+  local party = ns.db.party
+  if not party.range or UnitIsUnit(unit, "player") then
+    return false
+  end
+  local limit = party.rangeYards
+  local distance = Distance(unit)
+  if distance then
+    return distance > limit
+  end
+  local ok, far = pcall(function()
+    if limit <= SIGHT_YARDS and UnitIsVisible and not UnitIsVisible(unit) then
+      return true
+    end
+    if limit <= UNIT_IN_RANGE_YARDS and UnitInRange then
+      local inRange, checked = UnitInRange(unit)
+      return checked and not inRange
+    end
+    return false
+  end)
+  return ok and far or false
 end
 
 -- Seconds left below which a buff counts as ending soon; nil when that option is off.
@@ -452,6 +501,10 @@ function ns.SetupParty()
     party.refresh = true
   end
   party.refreshSeconds = party.refreshSeconds or ns.DEFAULT_REFRESH_SECONDS
+  if party.range == nil then
+    party.range = true
+  end
+  party.rangeYards = party.rangeYards or ns.DEFAULT_RANGE_YARDS
   party.soon = nil -- 1.0.0: replaced by refresh, now on by default
   party.off = party.off or {}
   party.classes = party.classes or {}
@@ -476,7 +529,10 @@ local function UpdateLooks()
         local _, noMana = IsUsable(spell.name)
         local reachable = UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and InRange(spell.name, unit)
         button.icon:SetDesaturated(done or false)
-        if done then
+        if TooFar(unit) then
+          -- only in combat, when the button can't be hidden: invisible until they come back
+          button:SetAlpha(0)
+        elseif done then
           button:SetAlpha(0.4)
           ns.T.SetBorderColor(button.border, ns.T.GREY)
         else
@@ -541,7 +597,7 @@ function ns.UpdateParty()
   for index, unit in ipairs(UNITS) do
     local needs = {}
     local frame = frames[unit]
-    if frame and auras[unit] and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) then
+    if frame and auras[unit] and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit) then
       for _, family in ipairs(FamiliesFor(unit)) do
         local remaining = Remaining(unit, family)
         if remaining == nil or EndsSoon(remaining) then
@@ -667,9 +723,11 @@ function ns.PartyDebug()
           shown = shown + 1
         end
       end
-      Say(string.format("%s %s: frame %s, buffs read %s, %s, buttons %d", unit, GetUnitName(unit, false) or "?",
-        FrameName(frames[unit]), auras[unit] and "yes" or "no",
-        #needs > 0 and table.concat(needs, " ") or "nothing to give", shown))
+      local distance = Distance(unit)
+      Say(string.format("%s %s: frame %s, buffs read %s, %s, buttons %d, distance %s%s", unit,
+        GetUnitName(unit, false) or "?", FrameName(frames[unit]), auras[unit] and "yes" or "no",
+        #needs > 0 and table.concat(needs, " ") or "nothing to give", shown,
+        distance and string.format("%d yd", distance) or "unknown", TooFar(unit) and " (too far)" or ""))
     end
   end
 end

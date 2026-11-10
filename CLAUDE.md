@@ -19,7 +19,10 @@ Shared conventions, release steps and the game client are in the workspace file 
   still without a frame are searched with `EnumerateFrames` (visible frame with `unit` attribute exactly `partyN` or the
   same person's `raidN`, at least 30x12, never our own buttons), cached, and retried with a growing wait (3 to 60 sec,
   reset on roster changes). `PlayerFrame` is never used and the search skips the player. Saved in `BuffTrackerDB.party`:
-  `enabled`, `refresh` (default on) + `refreshSeconds` (`ns.REFRESH_CHOICES`, default 60; 1.0.0's `soon` is dropped), `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win).
+  `enabled`, `refresh` (default on) + `refreshSeconds` (`ns.REFRESH_CHOICES`, default 60; 1.0.0's `soon` is dropped),
+  `range` (default on) + `rangeYards` (`ns.RANGE_CHOICES`, default 60: `TooFar` uses `UnitPosition` when it gives a
+  position on the same map, else only `UnitIsVisible` (~100 yd) and `UnitInRange` (~40 yd); out of combat far members get
+  no buttons, in combat their buttons go to alpha 0), `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win).
 - `Options.lua`: canvas page in Blizzard's settings: tracked buffs on the left, buffs and spells to add on the right.
 - `PartyOptions.lua`: "Party buffs" sub-page: group buff on/off boxes, blessing per class and per party member
   (cycle buttons, no dropdowns).

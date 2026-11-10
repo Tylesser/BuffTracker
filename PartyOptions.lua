@@ -17,7 +17,7 @@ if select(4, GetBuildInfo()) >= 30000 and select(4, GetBuildInfo()) < 40000 then
 end
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 
-local panel, enabledCheck, refreshCheck, refreshButton
+local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton
 local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
@@ -242,6 +242,9 @@ function ns.RefreshPartyOptions()
   refreshCheck:SetChecked(ns.db.party.refresh)
   refreshButton:SetText(ns.FormatSeconds(ns.db.party.refreshSeconds))
   refreshButton:SetEnabled(ns.db.party.refresh)
+  rangeCheck:SetChecked(ns.db.party.range)
+  rangeButton:SetText(ns.db.party.rangeYards .. " yd")
+  rangeButton:SetEnabled(ns.db.party.range)
   RefreshBuffs()
   RefreshBlessings()
 end
@@ -285,6 +288,36 @@ function ns.CreatePartyOptions()
     party.refreshSeconds = nextValue
     ns.PartyChanged()
   end)
+
+  -- Right column, beside the two boxes above: a distance limit, cycling through ns.RANGE_CHOICES.
+  rangeCheck = CheckBox(panel, "Hide when farther than")
+  rangeCheck:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X - 2, ns.T.OPTIONS_TOP)
+  rangeCheck:SetHitRectInsets(0, -(rangeCheck.Text:GetStringWidth() + 4), 0, 0)
+  rangeCheck:SetScript("OnClick", function(self)
+    ns.db.party.range = self:GetChecked() and true or false
+    ns.PartyChanged()
+  end)
+
+  rangeButton = ns.T.Button(panel, 56, 20)
+  rangeButton:SetPoint("LEFT", rangeCheck.Text, "RIGHT", 8, 0)
+  rangeButton:SetScript("OnClick", function()
+    local party = ns.db.party
+    local nextValue = ns.RANGE_CHOICES[1]
+    for _, yards in ipairs(ns.RANGE_CHOICES) do
+      if yards > party.rangeYards then
+        nextValue = yards
+        break
+      end
+    end
+    party.rangeYards = nextValue
+    ns.PartyChanged()
+  end)
+
+  local rangeHelp = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  rangeHelp:SetPoint("TOPLEFT", rangeCheck, "BOTTOMLEFT", 26, 0)
+  rangeHelp:SetWidth(RIGHT_WIDTH)
+  rangeHelp:SetJustifyH("LEFT")
+  rangeHelp:SetText("Closer members keep their buttons, red while out of spell range.")
 
   local buffTitle = ns.T.Heading(panel, "Your group buffs", LEFT_WIDTH)
   buffTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", LEFT_X, HEADING_Y)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- Party buff buttons hide for members farther than 60 yards. Closer members keep them, red while out of spell range. The distance can be set to 30, 40, 60, 80 or 100 yards, or turned off.
+- `/btrack debug` also shows how far each member is.
+
 ## 1.1.0
 
 - Party buff buttons now work with FlareUI, and with the party frames of most other unit frame addons.
