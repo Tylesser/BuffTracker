@@ -8,10 +8,35 @@ local _, ns = ...
 local SIZE = 24
 local GAP = 2
 local MAX_PER_UNIT = 4
-local SOON_SECONDS = 60
 local REFRESH_SECONDS = 1
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 local NO_MANA = { WARRIOR = true, ROGUE = true, DEATHKNIGHT = true, DEMONHUNTER = true }
+-- How often to look through all frames for a member whose frame wasn't found. Each search that
+-- finds nothing doubles the wait, up to the maximum; group changes start again at the minimum.
+local SEARCH_SECONDS, SEARCH_MAX_SECONDS = 3, 60
+
+-- "Also show buffs that end within": the choices, in seconds. The first one larger than the
+-- current value is next when the button is clicked.
+ns.REFRESH_CHOICES = { 10, 30, 60, 120, 300 }
+ns.DEFAULT_REFRESH_SECONDS = 60
+
+function ns.FormatSeconds(seconds)
+  if seconds >= 60 and seconds % 60 == 0 then
+    return (seconds / 60) .. " min"
+  end
+  return seconds .. " sec"
+end
+
+-- Seconds left below which a buff counts as ending soon; nil when that option is off.
+local function RefreshSeconds()
+  local party = ns.db.party
+  return party.refresh and party.refreshSeconds or nil
+end
+
+local function EndsSoon(remaining)
+  local seconds = RefreshSeconds()
+  return seconds ~= nil and remaining < seconds
+end
 
 -- Buffs you can give your group. The first spell is preferred; when it can't be cast (usually a
 -- missing reagent) the next one is used. Any of the spells counts as having the buff.
@@ -217,8 +242,10 @@ local function FrameUnit(frame)
   return type(unit) == "string" and unit or nil
 end
 
--- Blizzard's party frames, raid-style party frames, raid frames (your own group) and ElvUI.
--- The player's own PlayerFrame isn't used: the icon row covers your own buffs.
+-- Frames of addons we know by name, checked first: Blizzard's party frames, raid-style party
+-- frames, raid frames (your own group), ElvUI and FlareUI. Any other unit frame addon is found by
+-- the search further down. The player's own PlayerFrame isn't used: the icon row covers your own
+-- buffs.
 local function CandidateFrames()
   local list = {}
   local function Add(frame)
@@ -243,6 +270,9 @@ local function CandidateFrames()
   for i = 1, 5 do
     Add(_G["ElvUF_PartyGroup1UnitButton" .. i])
   end
+  for i = 0, 4 do
+    Add(_G["FlareUI_Party" .. i])
+  end
   for group = 1, 8 do
     for member = 1, 5 do
       Add(_G["CompactRaidGroup" .. group .. "Member" .. member])
@@ -252,6 +282,59 @@ local function CandidateFrames()
     Add(_G["CompactRaidFrame" .. i])
   end
   return list
+end
+
+local ownButtons = {} -- our own buttons have a unit too: never anchor to them
+local found = {}       -- party unit -> frame found by the search
+local nextSearch, searchWait = 0, SEARCH_SECONDS
+
+local function ResetSearch()
+  nextSearch, searchWait = 0, SEARCH_SECONDS
+end
+
+-- Whether a frame can be a party member's frame: a visible, frame-sized frame whose "unit"
+-- attribute is exactly that member, or in a raid the raid unit of the same person.
+local function SearchMatch(frame, unit)
+  local frameUnit = frame:GetAttribute("unit")
+  if type(frameUnit) ~= "string" or ownButtons[frame] then
+    return false
+  end
+  if frameUnit ~= unit and not (frameUnit:find("^raid%d+$") and UnitIsUnit(frameUnit, unit)) then
+    return false
+  end
+  if (frame.IsForbidden and frame:IsForbidden()) or not frame:IsVisible() then
+    return false
+  end
+  local width, height = frame:GetSize()
+  return width >= 30 and height >= 12
+end
+
+local function IsMatch(frame, unit)
+  local ok, match = pcall(SearchMatch, frame, unit)
+  return ok and match
+end
+
+-- Looks through every frame for the members not found yet. That's slow, so it waits between
+-- searches, and a frame found is kept for as long as it still shows that member.
+local function SearchFrames(missing)
+  if not EnumerateFrames or GetTime() < nextSearch then
+    return
+  end
+  local foundAny = false
+  local frame = EnumerateFrames()
+  while frame do
+    if frame.GetAttribute then
+      for unit in pairs(missing) do
+        if not found[unit] and IsMatch(frame, unit) then
+          found[unit] = frame
+          foundAny = true
+        end
+      end
+    end
+    frame = EnumerateFrames(frame)
+  end
+  searchWait = foundAny and SEARCH_SECONDS or math.min(searchWait * 2, SEARCH_MAX_SECONDS)
+  nextSearch = GetTime() + searchWait
 end
 
 local function FindFrames()
@@ -266,6 +349,26 @@ local function FindFrames()
           end
         end
       end
+    end
+  end
+
+  -- Any other party frame addon: party members only, your own frame is left out.
+  local missing = {}
+  for _, unit in ipairs(UNITS) do
+    if unit ~= "player" and not frames[unit] and UnitExists(unit) then
+      local frame = found[unit]
+      if frame and IsMatch(frame, unit) then
+        frames[unit] = frame
+      else
+        found[unit] = nil
+        missing[unit] = true
+      end
+    end
+  end
+  if next(missing) then
+    SearchFrames(missing)
+    for unit in pairs(missing) do
+      frames[unit] = found[unit]
     end
   end
   return frames
@@ -335,6 +438,7 @@ local function CreateButton()
     GameTooltip:Hide()
   end)
   button:Hide()
+  ownButtons[button] = true
   return button
 end
 
@@ -344,7 +448,11 @@ function ns.SetupParty()
   if party.enabled == nil then
     party.enabled = true
   end
-  party.soon = party.soon or false
+  if party.refresh == nil then
+    party.refresh = true
+  end
+  party.refreshSeconds = party.refreshSeconds or ns.DEFAULT_REFRESH_SECONDS
+  party.soon = nil -- 1.0.0: replaced by refresh, now on by default
   party.off = party.off or {}
   party.classes = party.classes or {}
   party.members = party.members or {}
@@ -364,7 +472,7 @@ local function UpdateLooks()
       if button:IsShown() and button.family then
         local unit, spell = button.unit, button.spell
         local has = auras[unit] and Remaining(unit, button.family)
-        local done = has and not (ns.db.party.soon and has < SOON_SECONDS)
+        local done = has and not EndsSoon(has)
         local _, noMana = IsUsable(spell.name)
         local reachable = UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and InRange(spell.name, unit)
         button.icon:SetDesaturated(done or false)
@@ -436,7 +544,7 @@ function ns.UpdateParty()
     if frame and auras[unit] and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) then
       for _, family in ipairs(FamiliesFor(unit)) do
         local remaining = Remaining(unit, family)
-        if remaining == nil or (party.soon and remaining < SOON_SECONDS) then
+        if remaining == nil or EndsSoon(remaining) then
           local spell, fellBack = ns.ChooseSpell(family)
           if spell and #needs < MAX_PER_UNIT then
             needs[#needs + 1] = { family = family, spell = spell, fellBack = fellBack }
@@ -467,6 +575,7 @@ end
 
 function ns.PartyChanged()
   dirty = true
+  ResetSearch()
   ns.RefreshPartyOptions()
 end
 
@@ -489,6 +598,9 @@ eventFrame:SetScript("OnEvent", function(_, event, unit)
     ns.RefreshKnown()
   end
   dirty = true
+  if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
+    ResetSearch()
+  end
   if event == "GROUP_ROSTER_UPDATE" then
     ns.RefreshPartyOptions()
   end
@@ -500,5 +612,64 @@ function ns.PartyTick(elapsed)
   sinceRefresh = sinceRefresh + elapsed
   if (dirty and not InCombatLockdown()) or sinceRefresh >= REFRESH_SECONDS then
     ns.UpdateParty()
+  end
+end
+
+-- /btrack debug: what the party buttons see, for bug reports.
+function ns.PartyDebug()
+  local function Say(text)
+    print(ns.PREFIX .. text)
+  end
+  local function FrameName(frame)
+    if not frame then
+      return "none"
+    end
+    local ok, name = pcall(frame.GetName, frame)
+    name = ok and name or "unnamed"
+    local okSize, width, height = pcall(frame.GetSize, frame)
+    if okSize and width then
+      name = string.format("%s (%dx%d)", name, width, height)
+    end
+    return name
+  end
+  local party = ns.db.party
+  Say(string.format("party buttons %s, in group %s, in combat %s",
+    party.enabled and "on" or "off", tostring(IsInGroup()), tostring(InCombatLockdown())))
+  local known = {}
+  for _, family in ipairs(ns.GROUP_BUFFS) do
+    if ns.KnowsFamily(family) then
+      known[#known + 1] = family.key .. (ns.FamilyEnabled(family) and "" or " (off)")
+    end
+  end
+  for _, family in ipairs(ns.KnownBlessings()) do
+    known[#known + 1] = family.key
+  end
+  Say("buffs you can give: " .. (#known > 0 and table.concat(known, ", ") or "none"))
+  for i = 0, 4 do
+    local frame = _G["FlareUI_Party" .. i]
+    if frame then
+      local ok, unit = pcall(frame.GetAttribute, frame, "unit")
+      Say(string.format("FlareUI_Party%d: unit %s, visible %s", i, tostring(ok and unit), tostring(frame:IsVisible())))
+    end
+  end
+  local frames = FindFrames()
+  for index, unit in ipairs(UNITS) do
+    if UnitExists(unit) then
+      local needs = {}
+      for _, family in ipairs(FamiliesFor(unit)) do
+        local remaining = auras[unit] and Remaining(unit, family)
+        needs[#needs + 1] = family.key .. "=" .. (remaining == nil and "missing"
+          or remaining == math.huge and "has" or string.format("%ds", remaining))
+      end
+      local shown = 0
+      for _, button in ipairs(buttons[index] or {}) do
+        if button:IsShown() then
+          shown = shown + 1
+        end
+      end
+      Say(string.format("%s %s: frame %s, buffs read %s, %s, buttons %d", unit, GetUnitName(unit, false) or "?",
+        FrameName(frames[unit]), auras[unit] and "yes" or "no",
+        #needs > 0 and table.concat(needs, " ") or "nothing to give", shown))
+    end
   end
 end

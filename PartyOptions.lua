@@ -17,7 +17,7 @@ if select(4, GetBuildInfo()) >= 30000 and select(4, GetBuildInfo()) < 40000 then
 end
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 
-local panel, enabledCheck, soonCheck
+local panel, enabledCheck, refreshCheck, refreshButton
 local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
@@ -239,7 +239,9 @@ function ns.RefreshPartyOptions()
     return
   end
   enabledCheck:SetChecked(ns.db.party.enabled)
-  soonCheck:SetChecked(ns.db.party.soon)
+  refreshCheck:SetChecked(ns.db.party.refresh)
+  refreshButton:SetText(ns.FormatSeconds(ns.db.party.refreshSeconds))
+  refreshButton:SetEnabled(ns.db.party.refresh)
   RefreshBuffs()
   RefreshBlessings()
 end
@@ -259,10 +261,28 @@ function ns.CreatePartyOptions()
     ns.PartyChanged()
   end)
 
-  soonCheck = CheckBox(panel, "Also show buffs that end within a minute")
-  soonCheck:SetPoint("TOPLEFT", enabledCheck, "BOTTOMLEFT", 0, 2)
-  soonCheck:SetScript("OnClick", function(self)
-    ns.db.party.soon = self:GetChecked() and true or false
+  refreshCheck = CheckBox(panel, "Also show buffs that end within")
+  refreshCheck:SetPoint("TOPLEFT", enabledCheck, "BOTTOMLEFT", 0, 2)
+  -- only the label is clickable: the time button sits right after it
+  refreshCheck:SetHitRectInsets(0, -(refreshCheck.Text:GetStringWidth() + 4), 0, 0)
+  refreshCheck:SetScript("OnClick", function(self)
+    ns.db.party.refresh = self:GetChecked() and true or false
+    ns.PartyChanged()
+  end)
+
+  -- Cycles through ns.REFRESH_CHOICES.
+  refreshButton = ns.T.Button(panel, 64, 20)
+  refreshButton:SetPoint("LEFT", refreshCheck.Text, "RIGHT", 8, 0)
+  refreshButton:SetScript("OnClick", function()
+    local party = ns.db.party
+    local nextValue = ns.REFRESH_CHOICES[1]
+    for _, seconds in ipairs(ns.REFRESH_CHOICES) do
+      if seconds > party.refreshSeconds then
+        nextValue = seconds
+        break
+      end
+    end
+    party.refreshSeconds = nextValue
     ns.PartyChanged()
   end)
 

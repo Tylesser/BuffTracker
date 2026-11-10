@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Party buff buttons now work with FlareUI, and with the party frames of most other unit frame addons.
+- "Also show buffs that end within" is now on by default, and its time can be set: 10 sec, 30 sec, 1 min, 2 min or 5 min.
+- `/btrack debug` shows what the party buttons see, for bug reports.
+
 ## 1.0.0
 
 - First version.

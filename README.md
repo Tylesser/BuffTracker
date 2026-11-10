@@ -30,8 +30,8 @@ When a party member is missing one of your group buffs, a small button with the 
 - **Paladin blessings:** choose a blessing for each class, like Might for warriors and Wisdom for casters, and change it for single party members. A member's own choice is kept by name.
 - **The tooltip** shows who is missing the buff, how many reagents you have, and when the single-target spell is used instead.
 - **Colors:** red icon = out of range, blue icon = not enough mana.
-- **Optional:** also show buffs that end within a minute, so you can refresh them in time.
-- Works with Blizzard's party frames, raid-style party frames and ElvUI. Your own buffs are in the icon row, so your own frame gets no buttons, except in raid-style party frames.
+- **Ending soon:** buffs that end within a minute also get a button, so you can refresh them in time. Click the time on the options page to pick 10 sec, 30 sec, 1 min, 2 min or 5 min, or untick the box to only show missing buffs.
+- Works with Blizzard's party frames, raid-style party frames, ElvUI and FlareUI, and finds the party frames of most other unit frame addons too. Your own buffs are in the icon row, so your own frame gets no buttons, except in raid-style party frames.
 
 **In combat** the game doesn't let addons add, move or remove these buttons. Buttons that are already there keep working, and a buff that lands only dims its button. Everything updates as soon as combat ends.
 
@@ -48,6 +48,7 @@ Type `/btrack` to open the options, or go to Esc > Options > AddOns > Tylesser -
 - `/btrack list`: show the tracked buffs and their state
 - `/btrack lock` / `/btrack unlock`: lock or move the icons
 - `/btrack reset`: put the icons back at the top of the screen
+- `/btrack debug`: show what the party buttons see (which frame each member has, and which buffs they're missing), useful for bug reports
 
 A name you type must match the buff's name, but capitals don't matter. If the game doesn't know the spell yet, the icon is a question mark until the buff first appears on you.
 

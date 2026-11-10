@@ -15,13 +15,16 @@ Shared conventions, release steps and the game client are in the workspace file 
   then the single-target one; English spell names; reagent item IDs only for the tooltip). `ns.ChooseSpell` takes the
   first known spell that `IsUsableSpell` allows (low mana doesn't count). Buttons are `SecureActionButtonTemplate`
   (type spell, unit partyN), 4 per unit, anchored beside the unit's frame found by scanning Blizzard party frames,
-  raid-style/raid frames, the `PartyFrame` pool and ElvUI (`PlayerFrame` is never used). Saved in `BuffTrackerDB.party`:
-  `enabled`, `soon`, `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win).
+  raid-style/raid frames, the `PartyFrame` pool, ElvUI and FlareUI (`FlareUI_Party0`-`4`) by name first. Party members
+  still without a frame are searched with `EnumerateFrames` (visible frame with `unit` attribute exactly `partyN` or the
+  same person's `raidN`, at least 30x12, never our own buttons), cached, and retried with a growing wait (3 to 60 sec,
+  reset on roster changes). `PlayerFrame` is never used and the search skips the player. Saved in `BuffTrackerDB.party`:
+  `enabled`, `refresh` (default on) + `refreshSeconds` (`ns.REFRESH_CHOICES`, default 60; 1.0.0's `soon` is dropped), `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win).
 - `Options.lua`: canvas page in Blizzard's settings: tracked buffs on the left, buffs and spells to add on the right.
 - `PartyOptions.lua`: "Party buffs" sub-page: group buff on/off boxes, blessing per class and per party member
   (cycle buttons, no dropdowns).
 - `Events.lua`: `ADDON_LOADED` setup, `UNIT_AURA` updates, the 0.2 second tick and the slash commands `/btrack` and
-  `/bufftracker`.
+  `/bufftracker` (`debug` prints `ns.PartyDebug()`: frame, buffs and buttons per party member).
 
 ## Rules
 

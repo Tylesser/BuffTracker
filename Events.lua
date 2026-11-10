@@ -96,6 +96,8 @@ SlashCmdList.BUFFTRACKER = function(msg)
     end
   elseif command == "party" then
     ns.OpenPartyOptions()
+  elseif command == "debug" then
+    ns.PartyDebug()
   elseif command == "list" then
     PrintList()
   elseif command == "lock" or command == "unlock" then
@@ -107,5 +109,6 @@ SlashCmdList.BUFFTRACKER = function(msg)
     print("  /btrack: open the options, /btrack party: party buff buttons and blessings")
     print("  /btrack add <name or spell ID>, /btrack remove <name>, /btrack list")
     print("  /btrack lock, /btrack unlock, /btrack reset (put the icons back in place)")
+    print("  /btrack debug: show what the party buttons see")
   end
 end
