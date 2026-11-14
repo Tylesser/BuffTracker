@@ -7,7 +7,7 @@ local _, ns = ...
 
 local SIZE = 24
 local GAP = 2
-local MAX_PER_UNIT = 4
+local MAX_PER_UNIT = 8 -- group buffs and, with "every blessing", up to six blessings
 local REFRESH_SECONDS = 1
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 local NO_MANA = { WARRIOR = true, ROGUE = true, DEATHKNIGHT = true, DEMONHUNTER = true }
@@ -237,17 +237,23 @@ end
 
 -- Buffs read per unit: lower-case name -> expiration time (0 = no timer). nil = not read yet.
 local auras = {}
+-- The same buffs that may be yours: cast by you, or the game doesn't say who cast them.
+local fromMe = {}
 
 local function ScanUnit(unit)
   local buffs, complete = ns.ReadBuffs(unit)
   if not complete and auras[unit] then
     return -- hidden right now: keep what we knew
   end
-  local found = {}
+  local found, mine = {}, {}
   for _, buff in ipairs(buffs) do
     found[buff.name:lower()] = buff.expires
+    if buff.mine ~= false then
+      mine[buff.name:lower()] = true
+    end
   end
   auras[unit] = complete and found or nil
+  fromMe[unit] = complete and mine or nil
 end
 
 -- Seconds left on any spell of the family; nil when the unit doesn't have it.
@@ -266,6 +272,67 @@ local function Remaining(unit, family)
   return best
 end
 
+-- Whether the unit has a blessing from you. A blessing whose caster the game doesn't give counts
+-- as yours, so "every blessing" never shows by mistake right after you bless someone.
+local function HasMyBlessing(unit)
+  local mine = fromMe[unit]
+  if not mine then
+    return false
+  end
+  for _, family in ipairs(ns.BLESSINGS) do
+    for _, spell in ipairs(family.spells) do
+      if mine[spell.name:lower()] then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+local function HasAnyBlessing(unit)
+  for _, family in ipairs(ns.BLESSINGS) do
+    if Remaining(unit, family) then
+      return true
+    end
+  end
+  return false
+end
+
+-- The blessings to offer the unit: the chosen one, or with "every blessing" on, each known
+-- blessing they're missing when they have none at all or another paladin gave them the chosen
+-- one. extra[family] marks the blessings shown only because of that. With it on, a blessing
+-- from you counts as done even when it isn't the chosen one.
+local function BlessingsFor(unit)
+  local chosen = ns.FAMILY[ns.BlessingFor(unit) or ""]
+  if not (chosen and ns.KnowsFamily(chosen)) then
+    return {}, {} -- "None", or a blessing you don't know
+  end
+  if not ns.db.party.allBlessings then
+    return { chosen }, {}
+  end
+  if HasMyBlessing(unit) then
+    -- any blessing from you will do, as you can keep only one on each member; the chosen one
+    -- stays in the list so it can still be refreshed when it ends soon
+    return Remaining(unit, chosen) and { chosen } or {}, {}
+  end
+  local chosenTaken = Remaining(unit, chosen) ~= nil
+  if not chosenTaken and HasAnyBlessing(unit) then
+    return { chosen }, {}
+  end
+  local list, extra = {}, {}
+  if not chosenTaken then
+    list[1] = chosen
+  end
+  for _, family in ipairs(ns.KnownBlessings()) do
+    if family ~= chosen and Remaining(unit, family) == nil then
+      list[#list + 1] = family
+      extra[family] = true
+    end
+  end
+  return list, extra
+end
+
+-- The buff families to offer the unit, and which blessings are extras (see BlessingsFor).
 local function FamiliesFor(unit)
   local list = {}
   local _, class = UnitClass(unit)
@@ -274,11 +341,11 @@ local function FamiliesFor(unit)
       list[#list + 1] = family
     end
   end
-  local blessing = ns.FAMILY[ns.BlessingFor(unit) or ""]
-  if blessing and ns.KnowsFamily(blessing) then
-    list[#list + 1] = blessing
+  local blessings, extra = BlessingsFor(unit)
+  for _, family in ipairs(blessings) do
+    list[#list + 1] = family
   end
-  return list
+  return list, extra
 end
 
 -- Party frames ---------------------------------------------------------------------------------
@@ -453,6 +520,10 @@ local function ShowTooltip(self)
     GameTooltip:AddLine("Can't cast " .. preferred.name .. ", so this casts " .. self.spell.name .. ".",
       1, 0.6, 0.2, true)
   end
+  if self.extra then
+    GameTooltip:AddLine(who .. " has no blessing from you, so every blessing they're missing is shown.",
+      0.6, 0.6, 0.6, true)
+  end
   if self.family.blessing then
     GameTooltip:AddLine("Change blessings: /btrack party", 0.6, 0.6, 0.6)
   end
@@ -481,6 +552,7 @@ local function CreateButton()
   button.icon:SetPoint("BOTTOMRIGHT", -3, 3)
   button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+  button.roundParts = { button.icon, backdrop }
 
   button:SetScript("OnEnter", ShowTooltip)
   button:SetScript("OnLeave", function()
@@ -504,6 +576,9 @@ function ns.SetupParty()
   if party.range == nil then
     party.range = true
   end
+  if party.allBlessings == nil then
+    party.allBlessings = true
+  end
   party.rangeYards = party.rangeYards or ns.DEFAULT_RANGE_YARDS
   party.soon = nil -- 1.0.0: replaced by refresh, now on by default
   party.off = party.off or {}
@@ -526,6 +601,9 @@ local function UpdateLooks()
         local unit, spell = button.unit, button.spell
         local has = auras[unit] and Remaining(unit, button.family)
         local done = has and not EndsSoon(has)
+        if button.family.blessing and not has and ns.db.party.allBlessings and HasMyBlessing(unit) then
+          done = true -- you blessed them in combat: the other choices are no longer needed
+        end
         local _, noMana = IsUsable(spell.name)
         local reachable = UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and InRange(spell.name, unit)
         button.icon:SetDesaturated(done or false)
@@ -534,10 +612,10 @@ local function UpdateLooks()
           button:SetAlpha(0)
         elseif done then
           button:SetAlpha(0.4)
-          ns.T.SetBorderColor(button.border, ns.T.GREY)
+          ns.SetFrameColor(button, ns.T.GREY)
         else
           button:SetAlpha(1)
-          ns.T.SetBorderColor(button.border, ns.T.GOLD_DEEP)
+          ns.SetFrameColor(button, ns.T.GOLD_DEEP)
         end
         if not reachable then
           button.icon:SetVertexColor(1, 0.3, 0.3)
@@ -598,12 +676,13 @@ function ns.UpdateParty()
     local needs = {}
     local frame = frames[unit]
     if frame and auras[unit] and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit) then
-      for _, family in ipairs(FamiliesFor(unit)) do
+      local families, extra = FamiliesFor(unit)
+      for _, family in ipairs(families) do
         local remaining = Remaining(unit, family)
-        if remaining == nil or EndsSoon(remaining) then
+        if remaining == nil or (EndsSoon(remaining) and not extra[family]) then
           local spell, fellBack = ns.ChooseSpell(family)
           if spell and #needs < MAX_PER_UNIT then
-            needs[#needs + 1] = { family = family, spell = spell, fellBack = fellBack }
+            needs[#needs + 1] = { family = family, spell = spell, fellBack = fellBack, extra = extra[family] }
           end
         end
       end
@@ -613,6 +692,8 @@ function ns.UpdateParty()
       local need = needs[slot]
       if need then
         button.unit, button.family, button.spell, button.fellBack = unit, need.family, need.spell, need.fellBack
+        button.extra = need.extra
+        ns.ApplyShape(button, ns.IsRound())
         button:SetAttribute("unit", unit)
         button:SetAttribute("spell", need.spell.name)
         button.icon:SetTexture(SpellIcon(need.spell.name) or ns.DEFAULT_ICON)
@@ -724,9 +805,9 @@ function ns.PartyDebug()
         end
       end
       local distance = Distance(unit)
-      Say(string.format("%s %s: frame %s, buffs read %s, %s, buttons %d, distance %s%s", unit,
-        GetUnitName(unit, false) or "?", FrameName(frames[unit]), auras[unit] and "yes" or "no",
-        #needs > 0 and table.concat(needs, " ") or "nothing to give", shown,
+      Say(string.format("%s %s: frame %s, buffs read %s, %s, blessing from you %s, buttons %d, distance %s%s",
+        unit, GetUnitName(unit, false) or "?", FrameName(frames[unit]), auras[unit] and "yes" or "no",
+        #needs > 0 and table.concat(needs, " ") or "nothing to give", HasMyBlessing(unit) and "yes" or "no", shown,
         distance and string.format("%d yd", distance) or "unknown", TooFar(unit) and " (too far)" or ""))
     end
   end

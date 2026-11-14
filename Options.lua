@@ -8,7 +8,7 @@ local LEFT_WIDTH = 270
 local RIGHT_X = 330
 local RIGHT_WIDTH = 240
 
-local panel, lockCheck, sizeText, searchBox, searchHint, status
+local panel, lockCheck, clickCheck, shapeButton, sizeText, searchBox, searchHint, status
 local trackedList, pickerList
 local spellbook = {}
 
@@ -179,7 +179,9 @@ function ns.RefreshOptions()
     return
   end
   lockCheck:SetChecked(ns.db.locked)
+  clickCheck:SetChecked(ns.db.clickToCast)
   sizeText:SetText("Icon size: " .. ns.db.iconSize)
+  shapeButton:SetText("Shape: " .. (ns.SHAPE_LABELS[ns.db.iconShape] or "Square"))
   RefreshTracked()
   RefreshPicker()
 end
@@ -216,6 +218,14 @@ function ns.CreateOptions()
     ns.SetLocked(self:GetChecked() and true or false)
   end)
 
+  clickCheck = ns.T.Check(panel, "Click icons to cast (out of combat)")
+  clickCheck:SetPoint("TOPLEFT", lockCheck, "BOTTOMLEFT", 0, 2)
+  -- only the label is clickable: the Shape button sits to the right
+  clickCheck:SetHitRectInsets(0, -(clickCheck.Text:GetStringWidth() + 4), 0, 0)
+  clickCheck:SetScript("OnClick", function(self)
+    ns.SetClickToCast(self:GetChecked() and true or false)
+  end)
+
   local smaller = CreateSizeButton("-", -2)
   smaller:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, top)
   sizeText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -224,15 +234,22 @@ function ns.CreateOptions()
   local larger = CreateSizeButton("+", 2)
   larger:SetPoint("LEFT", sizeText, "RIGHT", 6, 0)
 
+  -- Square or circle, for the icon row and the party buttons.
+  shapeButton = ns.T.Button(panel, 24 + 6 + 100 + 6 + 24, 22)
+  shapeButton:SetPoint("TOPLEFT", smaller, "BOTTOMLEFT", 0, -4)
+  shapeButton:SetScript("OnClick", function()
+    ns.CycleShape()
+  end)
+
   local trackedTitle = ns.T.Heading(panel, "Tracked buffs", LEFT_WIDTH)
-  trackedTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 36)
+  trackedTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 60)
 
   local addTitle = ns.T.Heading(panel, "Add a buff", RIGHT_WIDTH)
-  addTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, top - 36)
+  addTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, top - 60)
 
   searchBox = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
   searchBox:SetSize(RIGHT_WIDTH - 6, 22)
-  searchBox:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X + 6, top - 58)
+  searchBox:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X + 6, top - 82)
   ns.T.EditBox(searchBox)
   searchBox:SetAutoFocus(false)
   searchBox:SetScript("OnEnterPressed", AddFromSearchBox)
@@ -248,8 +265,8 @@ function ns.CreateOptions()
   status:SetPoint("TOP", subtitle, "BOTTOM", 0, -3)
   status:SetTextColor(1, 0.6, 0.2)
 
-  trackedList = CreateList(16, top - 60, LEFT_WIDTH)
-  pickerList = CreateList(RIGHT_X, top - 88, RIGHT_WIDTH)
+  trackedList = CreateList(16, top - 84, LEFT_WIDTH)
+  pickerList = CreateList(RIGHT_X, top - 112, RIGHT_WIDTH)
 
   panel:SetScript("OnShow", function()
     spellbook = ns.GetSpellbook()

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+- A Feedback button on the options page and a `/btrack feedback` command: they show the link to tylesser.com/feedback, where you can report a bug or suggest an idea.
+- Icons can be shown as circles: the Shape button on the options page switches the icon row and the party buttons between squares and circles.
+- The icon row can be moved in Edit Mode: while Edit Mode is open it shows all tracked icons and can be dragged.
+- Click an icon in the row to cast that buff on yourself, for buffs you know the spell for. Works out of combat; can be turned off on the options page.
+- Paladins: when a party member has no blessing, or another paladin already gave them the chosen one, a button shows for each blessing they're missing. On by default; turn it off on the Party buffs page.
+- Up to 8 buttons per party member (was 4), to make room for the blessings.
+
 ## 1.2.0
 
 - Party buff buttons hide for members farther than 60 yards. Closer members keep them, red while out of spell range. The distance can be set to 30, 40, 60, 80 or 100 yards, or turned off.

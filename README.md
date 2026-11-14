@@ -12,8 +12,10 @@ A World of Warcraft addon that **reminds you when a buff is missing**. Choose th
   - **When missing** (the default): only while it's not on you.
   - **When active:** only while it's on you.
   - **Always:** in full color while it's on you, dimmed with a red border while it's missing.
+- **Click to cast.** Click the icon of a buff you know the spell for, like Arcane Intellect or a blessing, to cast it on yourself. This works out of combat: the game doesn't let addons change clickable buttons in combat, so the icons can't be clicked then. Turn it off on the options page if you'd rather the icons never take a click.
 - **Time left and stacks** on icons of active buffs. The time turns red in the last minute.
-- **Move and resize.** The icons start at the top of the screen. Drag the row wherever you want it and set the icon size.
+- **Move and resize.** The icons start at the top of the screen. Drag the row wherever you want it, in Edit Mode or after unticking Lock position, and set the icon size.
+- **Square or round.** Show the icons, and the buttons next to party frames, as squares with a gold border or as circles with a gold ring.
 - **Saved per character,** because each class watches different buffs.
 
 ## Party buff buttons
@@ -28,6 +30,7 @@ When a party member is missing one of your group buffs, a small button with the 
   - Greater Blessing (Symbol of Kings) → Blessing
 - **Only where it helps.** Arcane Intellect and Divine Spirit aren't offered to warriors and rogues. Members who are dead or offline get no buttons.
 - **Paladin blessings:** choose a blessing for each class, like Might for warriors and Wisdom for casters, and change it for single party members. A member's own choice is kept by name.
+- **Every blessing when it helps (paladins):** when a member has no blessing at all, or another paladin already gave them the one you chose, a button appears for each blessing they don't have yet, so you can pick one that isn't taken. Once they have a blessing from you, the others go away. Turn this off on the options page to only see the chosen blessing.
 - **The tooltip** shows who is missing the buff, how many reagents you have, and when the single-target spell is used instead.
 - **Colors:** red icon = out of range, blue icon = not enough mana.
 - **Distance limit:** members farther than 60 yards get no buttons, so you only see buffs you can walk over and give. Closer members keep theirs, red while out of spell range. Pick 30, 40, 60, 80 or 100 yards on the options page, or untick the box to always show them. In dungeons and raids the game doesn't give addons exact positions, so there a member is hidden only once they're out of sight (about 100 yards), or past about 40 yards with a 30 or 40 yard limit.
@@ -40,7 +43,7 @@ Turn each group buff on or off and set the blessings at Esc > Options > AddOns >
 
 ## Usage
 
-Type `/btrack` to open the options, or go to Esc > Options > AddOns > Tylesser - Buff Tracker. Click a buff on the right to track it, then use the button next to it to choose when it shows. To move the icons, untick **Lock position** and drag them.
+Type `/btrack` to open the options, or go to Esc > Options > AddOns > Tylesser - Buff Tracker. Click a buff on the right to track it, then use the button next to it to choose when it shows. To move the icons, open Edit Mode (Esc > Edit Mode) and drag the Buff Tracker row, or untick **Lock position** and drag them.
 
 - `/btrack`: open the options
 - `/btrack party`: open the party buff options (group buffs and blessings)
@@ -50,6 +53,7 @@ Type `/btrack` to open the options, or go to Esc > Options > AddOns > Tylesser -
 - `/btrack lock` / `/btrack unlock`: lock or move the icons
 - `/btrack reset`: put the icons back at the top of the screen
 - `/btrack debug`: show what the party buttons see (which frame each member has, and which buffs they're missing), useful for bug reports
+- `/btrack feedback`: get the link to report a bug or suggest an idea
 
 A name you type must match the buff's name, but capitals don't matter. If the game doesn't know the spell yet, the icon is a question mark until the buff first appears on you.
 
@@ -58,6 +62,10 @@ Related buffs count separately. Gift of the Wild doesn't count as Mark of the Wi
 ## When the game hides buffs
 
 WoW Forever and Retail can hide buff details from addons at times, such as during combat. While buffs are hidden, each icon keeps what it last knew and keeps counting down. If the time runs out, the icon turns grey, because the addon can't tell whether the buff was refreshed. Everything updates again as soon as the game stops hiding buffs.
+
+## Feedback
+
+Found a bug or have an idea? Click **Feedback** on the options page or type `/btrack feedback` in game to get the link, or go straight to [tylesser.com/feedback](https://tylesser.com/feedback/#bufftracker).
 
 ## Installation
 

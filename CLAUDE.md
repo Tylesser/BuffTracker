@@ -7,19 +7,28 @@ Shared conventions, release steps and the game client are in the workspace file 
 - `Tylesser.lua`: the shared Tylesser "Runestone" look (`ns.T`: stone panels, gold borders, studs, Cinzel, buttons,
   check boxes, options page header, chat prefix). Loaded first. The same file is in every Tylesser addon: edit them together
   (see the workspace CLAUDE.md).
-- `Core.lua`: defaults for `BuffTrackerDB` (`SavedVariablesPerCharacter`: `tracked`, `locked`, `iconSize`, and `x`, `y` once the row has been moved; before that it sits at the top center of the screen), reading
+- `Core.lua`: defaults for `BuffTrackerDB` (`SavedVariablesPerCharacter`: `tracked`, `locked`, `iconSize`, `clickToCast`, `iconShape`, and `x`, `y` once the row has been moved; before that it sits at the top center of the screen), reading
   the player's buffs, `ns.state` per lowercase buff name, adding and removing buffs, and the spellbook list for the
   options page. A tracked entry is `{ name, icon, mode }`, where mode is `always`, `active` or `missing`.
-- `Display.lua`: the row of icons, centered on a draggable anchor, and `ns.Tick` (countdown and rescans).
+- `Display.lua`: the row of icons, centered on a draggable anchor, and `ns.Tick` (countdown and rescans). While
+  `EditModeManagerFrame` is shown (hooked OnShow/OnHide, only on clients that have it) the row acts unlocked without
+  changing `locked`. The position stays in `x`, `y`, not in Edit Mode layouts. Also the shape helpers shared with
+  `Party.lua`: `ns.ApplyShape(frame, round)` (mask `TempPortraitAlphaMask` on `frame.roundParts` and the highlight, ring
+  `Media/Ring.tga` in place of the double border) and `ns.SetFrameColor`. `iconShape` is `square` or `circle`.
+  `Media/Ring.tga` is BuffTracker's own (white, colored with SetVertexColor), built by `branding/source/ring-art.js`
+  (`node ring-art.js <depsDir> Media`).
 - `Party.lua`: party buff buttons. `ns.GROUP_BUFFS` and `ns.BLESSINGS` list each buff "family" (group spell first,
   then the single-target one; English spell names; reagent item IDs only for the tooltip). `ns.ChooseSpell` takes the
   first known spell that `IsUsableSpell` allows (low mana doesn't count). Buttons are `SecureActionButtonTemplate`
-  (type spell, unit partyN), 4 per unit, anchored beside the unit's frame found by scanning Blizzard party frames,
+  (type spell, unit partyN), 8 per unit, anchored beside the unit's frame found by scanning Blizzard party frames,
   raid-style/raid frames, the `PartyFrame` pool, ElvUI and FlareUI (`FlareUI_Party0`-`4`) by name first. Party members
   still without a frame are searched with `EnumerateFrames` (visible frame with `unit` attribute exactly `partyN` or the
   same person's `raidN`, at least 30x12, never our own buttons), cached, and retried with a growing wait (3 to 60 sec,
   reset on roster changes). `PlayerFrame` is never used and the search skips the player. Saved in `BuffTrackerDB.party`:
   `enabled`, `refresh` (default on) + `refreshSeconds` (`ns.REFRESH_CHOICES`, default 60; 1.0.0's `soon` is dropped),
+  `allBlessings` (default on: `BlessingsFor` adds every known missing blessing as `extra` when the member has no
+  blessing, or the chosen one is from another paladin; any blessing from you then counts as done. Who cast a buff comes
+  from `sourceUnit` / `isFromPlayerOrPlayerPet` / `UnitAura`'s caster as `buff.mine`; unknown counts as yours),
   `range` (default on) + `rangeYards` (`ns.RANGE_CHOICES`, default 60: `TooFar` uses `UnitPosition` when it gives a
   position on the same map, else only `UnitIsVisible` (~100 yd) and `UnitInRange` (~40 yd); out of combat far members get
   no buttons, in combat their buttons go to alpha 0), `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win).
@@ -37,8 +46,11 @@ Shared conventions, release steps and the game client are in the workspace file 
   (`issecretvalue`, `C_Secrets`). When Forever actually hides buffs still needs checking in game. Asking for auras while `C_Secrets.ShouldAurasBeSecret()` is true is an error, and comparing a secret value is an error.
   Keep every aura read behind the checks in `ReadBuffs`. A buff that can't be read keeps its last state, and a timer
   that ends while buffs are hidden means "unknown" (grey), never "missing" (red).
-- The on-screen icons don't take mouse clicks unless unlocked, so they can't block clicks in the world.
-- The icon row is plain frames, not secure buttons: it can't cast spells and needs no combat handling.
+- The on-screen icons are plain frames, so they can change in combat. Click to cast (`clickToCast`, default on) is a
+  separate pool of `SecureActionButtonTemplate` buttons in `Display.lua` (type spell, unit player), laid over the icons of
+  known spells out of combat only. They're anchored to UIParent at the icon's center, never to the icon, as that would
+  lock the icon in combat. They're hidden on `PLAYER_REGEN_DISABLED` (still allowed then) and laid out again on
+  `PLAYER_REGEN_ENABLED`, and never shown while unlocked. Icons without a known spell take no clicks.
 - Party buttons are secure: never call Show, Hide, SetPoint or SetAttribute on them in combat
   (`InCombatLockdown()`). `ns.UpdateParty` only recolors in combat and lays out again on `PLAYER_REGEN_ENABLED`.
 - Avoid UI templates that differ per client (sliders, dropdowns). The icon size uses plain buttons for this reason.

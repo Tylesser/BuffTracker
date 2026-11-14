@@ -7,7 +7,13 @@ ns.DEFAULT_ICON = 134400 -- question mark
 ns.defaults = {
   locked = true,
   iconSize = 36,
+  clickToCast = true,
+  iconShape = "square",
 }
+
+-- Icon shapes, in the order the options button cycles through them.
+ns.SHAPES = { "square", "circle" }
+ns.SHAPE_LABELS = { square = "Square", circle = "Circle" }
 
 ns.MIN_ICON_SIZE = 20
 ns.MAX_ICON_SIZE = 64
@@ -44,9 +50,10 @@ local function GetBuff(unit, index)
   elseif C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
     return C_UnitAuras.GetAuraDataByIndex(unit, index, "HELPFUL")
   end
-  local name, icon, count, _, duration, expirationTime = UnitAura(unit, index, "HELPFUL")
+  local name, icon, count, _, duration, expirationTime, source = UnitAura(unit, index, "HELPFUL")
   if name then
-    return { name = name, icon = icon, applications = count, duration = duration, expirationTime = expirationTime }
+    return { name = name, icon = icon, applications = count, duration = duration, expirationTime = expirationTime,
+      sourceUnit = source }
   end
 end
 
@@ -71,11 +78,20 @@ function ns.ReadBuffs(unit)
       if IsSecret(aura) or (canaccesstable and not canaccesstable(aura)) or IsSecret(aura.name) then
         complete = false
       else
+        -- mine: true when you cast it, false when someone else did, nil when the game doesn't say
+        local source, fromPlayer = Plain(aura.sourceUnit), Plain(aura.isFromPlayerOrPlayerPet)
+        local mine
+        if type(source) == "string" then
+          mine = source == "player"
+        elseif type(fromPlayer) == "boolean" then
+          mine = fromPlayer
+        end
         buffs[#buffs + 1] = {
           name = aura.name,
           icon = Plain(aura.icon),
           count = Plain(aura.applications) or 0,
           expires = Plain(aura.expirationTime) or 0,
+          mine = mine,
         }
       end
     end

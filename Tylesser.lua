@@ -303,6 +303,87 @@ function T.EditBox(box)
   return field
 end
 
+-- Feedback ---------------------------------------------------------------------------------------
+-- The game can't open a browser, so links are shown in a small window, selected and ready to copy.
+
+T.FEEDBACK_URL = "https://tylesser.com/feedback/#" .. addonName:lower()
+
+local linkWindow
+
+local function CreateLinkWindow()
+  local window = CreateFrame("Frame", nil, UIParent)
+  window:SetSize(400, 132)
+  window:SetPoint("CENTER", 0, 140)
+  window:SetFrameStrata("DIALOG")
+  window:SetToplevel(true)
+  window:EnableMouse(true)
+  window:SetMovable(true)
+  window:RegisterForDrag("LeftButton")
+  window:SetScript("OnDragStart", window.StartMoving)
+  window:SetScript("OnDragStop", window.StopMovingOrSizing)
+  window:SetClampedToScreen(true)
+  T.Stone(window, 14)
+  window.band = T.TitleBar(window, "Tylesser", 26)
+
+  local close = T.CloseButton(window)
+  close:SetPoint("RIGHT", window.band, "RIGHT", -4, 0)
+  close:SetScript("OnClick", function()
+    window:Hide()
+  end)
+
+  window.text = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  window.text:SetPoint("TOPLEFT", window.band, "BOTTOMLEFT", 10, -10)
+  window.text:SetPoint("RIGHT", window, "RIGHT", -16, 0)
+  window.text:SetJustifyH("LEFT")
+  window.text:SetTextColor(T.PARCHMENT[1], T.PARCHMENT[2], T.PARCHMENT[3])
+
+  local box = CreateFrame("EditBox", nil, window, "InputBoxTemplate")
+  box:SetSize(360, 20)
+  box:SetPoint("TOP", window.text, "BOTTOM", 0, -10)
+  box:SetPoint("LEFT", window, "LEFT", 22, 0)
+  box:SetAutoFocus(false)
+  T.EditBox(box)
+  -- read only: any typing puts the link back
+  box:SetScript("OnTextChanged", function(self, userInput)
+    if userInput and self:GetText() ~= window.url then
+      self:SetText(window.url)
+      self:HighlightText()
+    end
+  end)
+  box:SetScript("OnEditFocusGained", function(self)
+    self:HighlightText()
+  end)
+  box:SetScript("OnEscapePressed", function()
+    window:Hide()
+  end)
+  box:SetScript("OnEnterPressed", function()
+    window:Hide()
+  end)
+  window.box = box
+
+  local hint = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  hint:SetPoint("TOP", box, "BOTTOM", 0, -8)
+  hint:SetText("Press Ctrl+C to copy, then paste it into your browser.")
+  window:Hide()
+  return window
+end
+
+-- Shows a link to copy, with a line of text above it.
+function T.ShowLink(url, text)
+  linkWindow = linkWindow or CreateLinkWindow()
+  linkWindow.url = url
+  linkWindow.text:SetText(text or "")
+  linkWindow:Show()
+  linkWindow.box:SetText(url)
+  linkWindow.box:SetFocus()
+  linkWindow.box:HighlightText()
+end
+
+-- Opens the feedback link: bug reports and ideas go to tylesser.com/feedback.
+function T.ShowFeedback()
+  T.ShowLink(T.FEEDBACK_URL, "Found a bug or have an idea? Tell us on the Tylesser feedback page.")
+end
+
 local function Version()
   local getMetadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local version = getMetadata and getMetadata(addonName, "Version")
@@ -337,6 +418,11 @@ function T.OptionsPage(panel, name, subtitle)
       line:SetPoint("LEFT", tagline, "RIGHT", 8, 0)
     end
   end
+  local feedback = T.Button(panel, 92, 22, "Feedback")
+  feedback:SetPoint("TOPRIGHT", -16, -16)
+  feedback:SetScript("OnClick", T.ShowFeedback)
+  panel.feedbackButton = feedback
+
   local text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   text:SetPoint("TOP", tagline, "BOTTOM", 0, -8)
   text:SetPoint("LEFT", 24, 0)

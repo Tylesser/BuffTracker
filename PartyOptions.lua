@@ -17,7 +17,7 @@ if select(4, GetBuildInfo()) >= 30000 and select(4, GetBuildInfo()) < 40000 then
 end
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 
-local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton
+local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton, allBlessingsCheck
 local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
@@ -240,6 +240,7 @@ function ns.RefreshPartyOptions()
   end
   enabledCheck:SetChecked(ns.db.party.enabled)
   refreshCheck:SetChecked(ns.db.party.refresh)
+  allBlessingsCheck:SetChecked(ns.db.party.allBlessings)
   refreshButton:SetText(ns.FormatSeconds(ns.db.party.refreshSeconds))
   refreshButton:SetEnabled(ns.db.party.refresh)
   rangeCheck:SetChecked(ns.db.party.range)
@@ -335,6 +336,20 @@ function ns.CreatePartyOptions()
   note:SetJustifyH("LEFT")
   note:SetText("The group spell is used when you can cast it. Without its reagent, the button casts the "
     .. "single-target spell instead.")
+
+  allBlessingsCheck = CheckBox(panel, "Paladins: show every blessing they're missing")
+  allBlessingsCheck:SetPoint("TOPLEFT", note, "BOTTOMLEFT", -2, -12)
+  allBlessingsCheck:SetScript("OnClick", function(self)
+    ns.db.party.allBlessings = self:GetChecked() and true or false
+    ns.PartyChanged()
+  end)
+
+  local allBlessingsHelp = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  allBlessingsHelp:SetPoint("TOPLEFT", allBlessingsCheck, "BOTTOMLEFT", 26, 0)
+  allBlessingsHelp:SetWidth(LEFT_WIDTH - 26)
+  allBlessingsHelp:SetJustifyH("LEFT")
+  allBlessingsHelp:SetText("When a member has no blessing, or another paladin already gave them the one chosen on "
+    .. "the right, show a button for each blessing they don't have yet, not only the chosen one.")
 
   blessingTitle = ns.T.Heading(panel, "Blessings by class", RIGHT_WIDTH)
   blessingTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, HEADING_Y)
