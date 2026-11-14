@@ -307,6 +307,7 @@ end
 -- The game can't open a browser, so links are shown in a small window, selected and ready to copy.
 
 T.FEEDBACK_URL = "https://tylesser.com/feedback/#" .. addonName:lower()
+T.SITE_URL = "https://tylesser.com/"
 
 local linkWindow
 
@@ -373,6 +374,8 @@ function T.ShowLink(url, text)
   linkWindow = linkWindow or CreateLinkWindow()
   linkWindow.url = url
   linkWindow.text:SetText(text or "")
+  -- grow with the text: one line of text gives the original 132
+  linkWindow:SetHeight(118 + math.max(linkWindow.text:GetStringHeight() or 14, 14))
   linkWindow:Show()
   linkWindow.box:SetText(url)
   linkWindow.box:SetFocus()
@@ -381,7 +384,13 @@ end
 
 -- Opens the feedback link: bug reports and ideas go to tylesser.com/feedback.
 function T.ShowFeedback()
-  T.ShowLink(T.FEEDBACK_URL, "Found a bug or have an idea? Tell us on the Tylesser feedback page.")
+  T.ShowLink(T.FEEDBACK_URL, "Found a bug or have an idea? Tell us on the Tylesser feedback page.\n"
+    .. "More Tylesser addons are on tylesser.com.")
+end
+
+-- Opens the link to all Tylesser addons.
+function T.ShowMoreAddons()
+  T.ShowLink(T.SITE_URL, "All Tylesser addons, with their features and changelogs, are on tylesser.com.")
 end
 
 local function Version()
@@ -422,6 +431,11 @@ function T.OptionsPage(panel, name, subtitle)
   feedback:SetPoint("TOPRIGHT", -16, -16)
   feedback:SetScript("OnClick", T.ShowFeedback)
   panel.feedbackButton = feedback
+
+  local more = T.Button(panel, 92, 22, "More addons")
+  more:SetPoint("TOPRIGHT", feedback, "BOTTOMRIGHT", 0, -6)
+  more:SetScript("OnClick", T.ShowMoreAddons)
+  panel.moreAddonsButton = more
 
   local text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   text:SetPoint("TOP", tagline, "BOTTOM", 0, -8)

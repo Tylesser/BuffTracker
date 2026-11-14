@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- A **More addons** button on the options page, and the feedback window points to tylesser.com for the other Tylesser addons.
+
 ## 1.3.0
 
 - A Feedback button on the options page and a `/btrack feedback` command: they show the link to tylesser.com/feedback, where you can report a bug or suggest an idea.
