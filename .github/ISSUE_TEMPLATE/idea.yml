@@ -1,0 +1,29 @@
+name: Suggest an idea
+description: A feature or change you'd like in Buff Tracker.
+title: "[Idea] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like the addon to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it would help
+      description: When would you use it? What do you do today instead?
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game version you play
+      options:
+        - WoW Forever
+        - Classic Era / Hardcore / Season
+        - TBC Classic
+        - Wrath Classic
+        - Mists of Pandaria Classic
+        - Retail (The War Within / Midnight)
+        - Other

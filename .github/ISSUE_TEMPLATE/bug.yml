@@ -1,0 +1,48 @@
+name: Report a bug
+description: Something in Buff Tracker doesn't work as it should.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to tell us. A short description is fine; the more we know, the faster it gets fixed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: I opened the vendor window and...
+    validations:
+      required: true
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game version
+      options:
+        - WoW Forever
+        - Classic Era / Hardcore / Season
+        - TBC Classic
+        - Wrath Classic
+        - Mists of Pandaria Classic
+        - Retail (The War Within / Midnight)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Addon version
+      description: Shown on the addon's options page (Esc > Options > AddOns > Tylesser - Buff Tracker) or in your addon manager.
+      placeholder: "1.2.0"
+  - type: textarea
+    id: error
+    attributes:
+      label: Lua error
+      description: "If the game showed an error, paste it here. Type /console scriptErrors 1 in chat to make errors show. For party button problems, the output of /btrack debug helps too."
+      render: text
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other addons
+      description: Other addons you use that might be involved, such as unit frame or bag addons.
