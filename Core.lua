@@ -102,6 +102,53 @@ function ns.ReadBuffs(unit)
   return buffs, complete
 end
 
+local function GetDebuff(unit, index, filter)
+  if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+    return C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
+  end
+  local name, icon, count, debuffType, _, expirationTime = UnitAura(unit, index, filter)
+  if name then
+    return { name = name, icon = icon, applications = count, dispelName = debuffType, expirationTime = expirationTime }
+  end
+end
+
+-- The unit's debuffs that have a type (Magic, Curse, Disease, Poison): { name, icon, type, count,
+-- expires }. filter is "HARMFUL", or "HARMFUL|RAID" for only those the game says you can remove.
+-- Debuffs the game hides are left out, with the same checks as ReadBuffs.
+function ns.ReadDebuffs(unit, filter)
+  local debuffs = {}
+  if C_Secrets and C_Secrets.ShouldAurasBeSecret and C_Secrets.ShouldAurasBeSecret() then
+    return debuffs
+  end
+  for index = 1, MAX_BUFFS do
+    local hidden = false
+    if C_Secrets and C_Secrets.ShouldUnitAuraIndexBeSecret then
+      -- pcall: only "HELPFUL" is known to work here; the values themselves are checked below anyway
+      local ok, secret = pcall(C_Secrets.ShouldUnitAuraIndexBeSecret, unit, index, filter)
+      hidden = ok and secret or false
+    end
+    if not hidden then
+      local aura = GetDebuff(unit, index, filter)
+      if not aura then
+        break
+      end
+      if not (IsSecret(aura) or (canaccesstable and not canaccesstable(aura)) or IsSecret(aura.name)) then
+        local debuffType = Plain(aura.dispelName)
+        if type(debuffType) == "string" and debuffType ~= "" then
+          debuffs[#debuffs + 1] = {
+            name = aura.name,
+            icon = Plain(aura.icon),
+            type = debuffType,
+            count = Plain(aura.applications) or 0,
+            expires = Plain(aura.expirationTime) or 0,
+          }
+        end
+      end
+    end
+  end
+  return debuffs
+end
+
 -- Alerts ----------------------------------------------------------------------------------------
 -- A tracked buff with "Alert" on that drops while you're in combat plays the raid warning sound
 -- and flashes its icon. Display.lua flashes the icons named in ns.pendingFlash.

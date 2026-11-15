@@ -22,9 +22,11 @@ local function Setup()
   BuffTrackerDB.tracked = BuffTrackerDB.tracked or {}
   ns.db = BuffTrackerDB
   ns.SetupParty()
+  ns.SetupDispel()
   ns.CreateDisplay()
   ns.CreateOptions()
   ns.CreatePartyOptions()
+  ns.CreateDispelOptions()
   ns.T.AddCompartment({ text = ns.TITLE, onClick = ns.OpenOptions, tooltip = { "Click to open the options." } })
 end
 
@@ -134,6 +136,8 @@ SlashCmdList.BUFFTRACKER = function(msg)
     end
   elseif command == "party" then
     ns.OpenPartyOptions()
+  elseif command == "dispel" or command == "dispels" then
+    ns.OpenDispelOptions()
   elseif command == "debug" then
     ns.PartyDebug()
   elseif command == "feedback" then
@@ -147,6 +151,7 @@ SlashCmdList.BUFFTRACKER = function(msg)
   else
     print(ns.PREFIX .. "commands:")
     print("  /btrack: open the options, /btrack party: party buff buttons and blessings")
+    print("  /btrack dispel: dispel buttons for your party and yourself")
     print("  /btrack add <name or spell ID>, /btrack remove <name>, /btrack list")
     print("  /btrack basics: track the basic buffs of your class")
     print("  /btrack item <buff> = <item>: the item a click on that icon uses")

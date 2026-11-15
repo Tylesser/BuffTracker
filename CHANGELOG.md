@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0
+
+- **Dispel buttons:** when a party member has a debuff you can remove, like a poison or a curse, a button with its icon appears next to their party frame. Click it to cast your dispel on them. The same buttons for your own debuffs sit under your icon row.
+- They follow the spells you know: a paladin with Purify gets Poison and Disease, and Magic too once they learn Cleanse. Works for paladins, priests, druids, shamans and mages, and from Mists of Pandaria on for every class with a dispel.
+- They also work in combat: as a fight starts each member gets an empty spot for your dispels, which shows the debuff as soon as one you can remove appears.
+- A new **Dispels** options page (`/btrack dispel`) turns the party and personal buttons on or off and lists your dispels.
+
 ## 1.4.0
 
 - **Consumables:** click an icon to use an item. Items you wear, like trinkets, aren't offered, as a click would equip them. A buff you don't have the spell for, like an elixir or a scroll, uses the bag item of the same name. You can also choose the item yourself for any tracked buff on the options page (for example a food for Well Fed), or with `/btrack item <buff> = <item>`. The icon shows how many you have left.

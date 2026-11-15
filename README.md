@@ -2,7 +2,7 @@
 
 # Tylesser - Buff Tracker
 
-A World of Warcraft addon that **reminds you when a buff is missing**. Choose the buffs you care about, like Righteous Fury, your blessings or an elixir, and an icon appears on screen whenever one of them isn't on you. In a group, **buttons appear next to your party and raid frames** for the buffs your group is missing: click one to cast it on that member.
+A World of Warcraft addon that **reminds you when a buff is missing**. Choose the buffs you care about, like Righteous Fury, your blessings or an elixir, and an icon appears on screen whenever one of them isn't on you. In a group, **buttons appear next to your party and raid frames** for the buffs your group is missing: click one to cast it on that member. **Dispel buttons** do the same for debuffs you can remove, like a poison or a curse, on your party and on yourself.
 
 ## Features
 
@@ -47,12 +47,26 @@ When a party member is missing one of your group buffs, a small button with the 
 
 Turn each group buff on or off and set the blessings at Esc > Options > AddOns > Tylesser - Buff Tracker > Party buffs, or with `/btrack party`.
 
+## Dispel buttons
+
+When a party member has a debuff you can remove, a button with the debuff's icon appears next to their party frame, after any buff buttons. Its border has the debuff type's color: blue for Magic, purple for Curse, brown for Disease, green for Poison. Click it to cast your dispel on them. A row of the same buttons for yourself sits under your icon row.
+
+- **It follows the spells you know.** A paladin with Purify gets buttons for Poison and Disease, and once they learn Cleanse, for Magic too. When two of your spells remove the same type, the better one is used: Cleanse over Purify, Abolish Disease over Cure Disease, Abolish Poison over Cure Poison.
+- **Every class with a dispel:** paladins (Purify, Cleanse), priests (Dispel Magic, Cure Disease, Abolish Disease), druids (Remove Curse, Cure Poison, Abolish Poison), shamans (Cure Poison, Cure Disease; Cure Toxins and Cleanse Spirit on Wrath) and mages (Remove Lesser Curse, Remove Curse). From Mists of Pandaria on, the game itself tells which debuffs your spec can remove, and monks and evokers are covered too.
+- **The tooltip** lists the debuffs the button removes.
+- **Colors:** red icon = out of range, blue icon = not enough mana. Members farther than the distance limit get no dispel buttons either.
+- **In combat:** the game doesn't let addons add or remove buttons during a fight. So as combat starts, each party member (and you) gets a spot for every dispel you know. The spot stays empty until a debuff you can remove shows up, then its button appears at once. An empty spot still takes a click, which just tells you there's nothing to dispel. After combat the empty spots go away.
+- **Party only.** In a raid the game would only let them show out of combat, so raids get none. Your own row works anywhere, also when you play alone.
+
+Turn either one off at Esc > Options > AddOns > Tylesser - Buff Tracker > Dispels, or with `/btrack dispel`. That page also lists the dispels you know and what each one removes.
+
 ## Usage
 
 Type `/btrack` to open the options, go to Esc > Options > AddOns > Tylesser - Buff Tracker, or pick Buff Tracker in the addon menu by the minimap. Click a buff on the right to track it, then use the button next to it to choose when it shows. To move the icons, open Edit Mode (Esc > Edit Mode) and drag the Buff Tracker row, or untick **Lock position** and drag them.
 
 - `/btrack`: open the options
 - `/btrack party`: open the party buff options (group buffs and blessings)
+- `/btrack dispel`: open the dispel options
 - `/btrack add <name or spell ID>`: track a buff
 - `/btrack basics`: track the basic buffs of your class
 - `/btrack item <buff> = <item>`: the item a click on that icon uses (name, item ID or shift-clicked link); `/btrack item <buff>` for none
@@ -60,7 +74,7 @@ Type `/btrack` to open the options, go to Esc > Options > AddOns > Tylesser - Bu
 - `/btrack list`: show the tracked buffs and their state
 - `/btrack lock` / `/btrack unlock`: lock or move the icons
 - `/btrack reset`: put the icons back at the top of the screen
-- `/btrack debug`: show what the party buttons see (which frame each member has, and which buffs they're missing), useful for bug reports
+- `/btrack debug`: show what the party buttons see (which frame each member has, which buffs they're missing and which debuffs you can remove), useful for bug reports
 - `/btrack feedback`: get the link to report a bug or suggest an idea
 
 A name you type must match the buff's name, but capitals don't matter. If the game doesn't know the spell yet, the icon is a question mark until the buff first appears on you.
@@ -69,7 +83,7 @@ Related buffs count separately. Gift of the Wild doesn't count as Mark of the Wi
 
 ## When the game hides buffs
 
-WoW Forever and Retail can hide buff details from addons at times, such as during combat. While buffs are hidden, each icon keeps what it last knew and keeps counting down. If the time runs out, the icon turns grey, because the addon can't tell whether the buff was refreshed. Everything updates again as soon as the game stops hiding buffs. While buffs are hidden the addon can't see one drop, so **Alert** can't go off then.
+WoW Forever and Retail can hide buff details from addons at times, such as during combat. While buffs are hidden, each icon keeps what it last knew and keeps counting down. If the time runs out, the icon turns grey, because the addon can't tell whether the buff was refreshed. Everything updates again as soon as the game stops hiding buffs. While buffs are hidden the addon can't see one drop, so **Alert** can't go off then. Hidden debuffs get no dispel button.
 
 ## Feedback
 

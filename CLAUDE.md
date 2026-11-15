@@ -63,9 +63,20 @@ Shared conventions, release steps and the game client are in the workspace file 
   position on the same map, else only `UnitIsVisible` (~100 yd) and `UnitInRange` (~40 yd); out of combat far members get
   no buttons, in combat their buttons go to alpha 0), `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win),
   `reagentWarn` (`ns.REAGENT_CHOICES`, default 5, 0 = off), `raid` (default on).
+- `Dispel.lua`: dispel buttons. `ns.DISPELS` (per client: Classic Era/Forever/TBC/Wrath vs MoP+; English names, best
+  first, `types` + `typeList`), `ns.DISPEL_FILTER` (`HARMFUL`, or `HARMFUL|RAID` on MoP+ where talents decide and the game
+  filters), `ns.DispelSpells()` (known dispels that add a type not covered by an earlier one; cached per `ns.known`
+  table), `ns.RemovableDebuffs(debuffs)` (`{ [spell] = { debuff... } }`, keyed by the `ns.DISPELS` entries), the
+  shared tooltip, `BuffTrackerDB.dispel` (`party`, `self`, both default on) and the player's own row: secure buttons
+  (`ns.NewSecureButton` from Party.lua, unit player) on UIParent at coordinates under the row anchor (`ns.RowAnchor`,
+  hidden while `ns.IsRowUnlocked`), laid out from `ns.UpdateDisplay`. Debuffs are read with `ns.ReadDebuffs(unit,
+  filter)` in Core.lua (typed debuffs only, same secret checks as `ReadBuffs`). In Party.lua dispel slots come after the
+  buff buttons in a member's row (so buff buttons never move when dispel slots come and go) (`need.dispel`, `button.dispel`), party only (not raids), and `DispelLooks` sets icon (the
+  debuff's), border (type color), alpha.
 - `Options.lua`: canvas page in Blizzard's settings: tracked buffs on the left (two-line rows: name, "when" and X; then
   the "Use item" cycle button, right-click clears, and the Alert box), buffs, spells and the two weapon enchant entries
   to add on the right, and "Add <class> basics" above the tracked list (hidden for classes without `ns.PRESETS`).
+- `DispelOptions.lua`: "Dispels" sub-page (`/btrack dispel`): the two check boxes and the dispels you know.
 - `PartyOptions.lua`: "Party buffs" sub-page: group buff on/off boxes, blessing per class and per party member
   (cycle buttons, no dropdowns; the member list is your own party, also in a raid), "Buttons on raid frames", and the
   low reagent warning level.
@@ -93,4 +104,9 @@ Shared conventions, release steps and the game client are in the workspace file 
 - Alerts depend on reading buffs in combat. While `ReadBuffs` can't (secret values) a drop isn't seen, so no alert.
 - Party buttons are secure: never call Show, Hide, SetPoint or SetAttribute on them in combat
   (`InCombatLockdown()`). `ns.UpdateParty` only recolors in combat and lays out again on `PLAYER_REGEN_ENABLED`.
+- Dispels matter in combat, when buttons can't appear. On `PLAYER_REGEN_DISABLED` (still before the lockdown)
+  `ns.UpdateParty(true)` and `ns.UpdateSelfDispel(true)` give every member, and you, a slot per known dispel; in combat
+  only alpha (0 = nothing to remove), icon and border change. An empty slot still takes a click (documented). In a
+  party with dispel buttons `ns.PartyTick` also updates right after events in combat, so a debuff shows within a
+  tick; otherwise (and in raids) the once-a-second refresh in combat stays. Empty slots show no tooltip.
 - Avoid UI templates that differ per client (sliders, dropdowns). The icon size uses plain buttons for this reason.

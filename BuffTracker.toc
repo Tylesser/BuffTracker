@@ -1,6 +1,6 @@
 ## Interface: 16001, 11508, 11509, 20506, 38000, 50504, 120100, 120105
 ## Title: Tylesser - Buff Tracker
-## Notes: Pick the buffs you care about and get an icon whenever one is missing, plus click-to-buff buttons on your party frames.
+## Notes: Pick the buffs you care about and get an icon whenever one is missing, plus click-to-buff and click-to-dispel buttons on your party frames.
 ## Author: Tylesser
 ## Version: @project-version@
 ## SavedVariablesPerCharacter: BuffTrackerDB
@@ -14,6 +14,8 @@ Tylesser.lua
 Core.lua
 Display.lua
 Party.lua
+Dispel.lua
 Options.lua
 PartyOptions.lua
+DispelOptions.lua
 Events.lua

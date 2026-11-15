@@ -7,12 +7,15 @@ local _, ns = ...
 -- member only dims its button. Raid buttons sit on a secure holder that the game itself hides in
 -- combat (a state driver), so they never catch a click meant for healing. Buttons are made only
 -- when first needed (out of combat), as each one costs memory.
+-- In a party, dispel buttons follow the buff buttons in a member's row (see Dispel.lua): as combat
+-- starts each member gets one for every dispel you know, invisible until a debuff it removes shows
+-- up. After the buffs, so the buff buttons never move under the mouse when those come and go.
 
 local SIZE = 24
 local RAID_MIN_SIZE, RAID_MAX_SIZE = 12, 14 -- buttons in a raid frame's corner
 local RAID_WIDTH_SHARE = 1 / 3 -- they take at most about this much of the raid frame's width
 local GAP = 2
-local MAX_PER_UNIT = 8 -- group buffs and, with "every blessing", up to six blessings
+local MAX_PER_UNIT = 10 -- dispels, group buffs and, with "every blessing", up to six blessings
 local REFRESH_SECONDS = 1
 local RAID_DIRTY_SECONDS = 0.5 -- in a raid, events come often: lay out at most this often
 local RAID_FULL_SCAN_SECONDS = 5 -- in a raid, buffs are read on UNIT_AURA, and all of them this often
@@ -345,8 +348,20 @@ end
 local auras = {}
 -- The same buffs that may be yours: cast by you, or the game doesn't say who cast them.
 local fromMe = {}
+-- Debuffs you can remove, per unit: { [dispel spell] = { debuff, ... } } (ns.RemovableDebuffs).
+local removable = {}
+
+-- Dispel buttons: in a party (not a raid), when on and you know a dispel.
+local function DispelsOn()
+  return ns.db.dispel.party and not (IsInRaid and IsInRaid()) and #ns.DispelSpells() > 0
+end
 
 local function ScanUnit(unit)
+  if DispelsOn() then
+    removable[unit] = ns.RemovableDebuffs(ns.ReadDebuffs(unit, ns.DISPEL_FILTER))
+  else
+    removable[unit] = nil
+  end
   local buffs, complete = ns.ReadBuffs(unit)
   if not complete and auras[unit] then
     return -- hidden right now: keep what we knew
@@ -664,6 +679,14 @@ local function GroupUnits()
 end
 
 local function ShowTooltip(self)
+  if self.dispel then
+    if self:GetAlpha() == 0 then
+      return -- an empty spot in combat
+    end
+    local list = removable[self.unit] and removable[self.unit][self.dispel]
+    ns.DispelTooltip(self, self.dispel, GetUnitName(self.unit, false) or self.unit, list)
+    return
+  end
   if not self.family then
     return
   end
@@ -716,7 +739,9 @@ local function RaidHolder()
   return raidHolder
 end
 
-local function CreateButton(parent)
+-- A secure button with the Tylesser look (also used for your own dispel buttons in Dispel.lua).
+-- Hidden; out of combat only.
+function ns.NewSecureButton(parent)
   local button = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
   button:SetSize(SIZE, SIZE)
   -- Newer clients run secure clicks on key down or up depending on a setting; they need both.
@@ -738,12 +763,16 @@ local function CreateButton(parent)
   button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
   button.roundParts = { button.icon, backdrop }
+  button:Hide()
+  return button
+end
 
+local function CreateButton(parent)
+  local button = ns.NewSecureButton(parent)
   button:SetScript("OnEnter", ShowTooltip)
   button:SetScript("OnLeave", function()
     GameTooltip:Hide()
   end)
-  button:Hide()
   ownButtons[button] = true
   return button
 end
@@ -792,11 +821,49 @@ function ns.SetupParty()
   ns.RefreshKnown()
 end
 
+-- Whether a secure group frame now shows someone else (they can reshuffle in combat).
+local function FrameMoved(button)
+  local frameUnit = button.frame and FrameUnit(button.frame)
+  return frameUnit ~= nil and frameUnit ~= button.unit and not UnitIsUnit(frameUnit, button.unit)
+end
+
+-- A dispel button: the icon of the first debuff it removes, in that debuff type's color.
+-- Invisible (alpha 0) while there's nothing to remove: only in combat, when it can't be hidden.
+local function DispelLooks(button)
+  local unit, spell = button.unit, button.dispel
+  local list = removable[unit] and removable[unit][spell]
+  if not list or TooFar(unit) or not UnitIsConnected(unit) or UnitIsDeadOrGhost(unit) then
+    button:SetAlpha(0)
+    return
+  end
+  local debuff = list[1]
+  local moved = FrameMoved(button)
+  button.icon:SetTexture(debuff.icon or SpellIcon(spell.name) or ns.DEFAULT_ICON)
+  button.icon:SetDesaturated(moved)
+  if moved then
+    button:SetAlpha(0.25)
+    ns.SetFrameColor(button, ns.T.GREY)
+  else
+    button:SetAlpha(1)
+    ns.SetFrameColor(button, ns.DebuffColor(debuff.type))
+  end
+  local _, noMana = IsUsable(spell.name)
+  if not InRange(spell.name, unit) then
+    button.icon:SetVertexColor(1, 0.3, 0.3)
+  elseif noMana then
+    button.icon:SetVertexColor(0.4, 0.4, 1)
+  else
+    button.icon:SetVertexColor(1, 1, 1)
+  end
+end
+
 -- Colors only: allowed in combat.
 local function UpdateLooks()
   for _, row in pairs(buttons) do
     for _, button in ipairs(row) do
-      if button:IsShown() and button.family then
+      if button:IsShown() and button.dispel then
+        DispelLooks(button)
+      elseif button:IsShown() and button.family then
         local unit, spell = button.unit, button.spell
         local has = auras[unit] and Remaining(unit, button.family)
         local done = has and not EndsSoon(has)
@@ -806,8 +873,7 @@ local function UpdateLooks()
         local _, noMana = IsUsable(spell.name)
         local reachable = UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and InRange(spell.name, unit)
         -- secure group frames can reshuffle in combat: the frame may now show someone else
-        local frameUnit = button.frame and FrameUnit(button.frame)
-        local moved = frameUnit ~= nil and frameUnit ~= unit and not UnitIsUnit(frameUnit, unit)
+        local moved = FrameMoved(button)
         button.icon:SetDesaturated(done or moved or false)
         if TooFar(unit) then
           -- only in combat, when the button can't be hidden: invisible until they come back
@@ -879,7 +945,9 @@ local function PlaceButton(row, slot, frame, side, size)
   button:SetFrameLevel(frame:GetFrameLevel() + 10)
 end
 
-function ns.UpdateParty()
+-- combatStart: called as combat starts (PLAYER_REGEN_DISABLED, still out of the lockdown), so
+-- every party member gets a button for each dispel you know.
+function ns.UpdateParty(combatStart)
   if not (ns.db and ready) then
     return
   end
@@ -899,6 +967,11 @@ function ns.UpdateParty()
       ScanUnit(unit)
     end
   end
+  for unit in pairs(removable) do
+    if not inGroup[unit] or not UnitExists(unit) then
+      removable[unit] = nil
+    end
+  end
   for unit in pairs(auras) do
     if not inGroup[unit] then
       auras[unit], fromMe[unit] = nil, nil
@@ -906,23 +979,26 @@ function ns.UpdateParty()
   end
   stale, rescanAll = {}, false
   if InCombatLockdown() then
-    dirty = true -- lay out again when combat ends
+    -- PLAYER_REGEN_ENABLED lays out again when combat ends
     UpdateLooks()
     return
   end
 
   local party = ns.db.party
-  local show = party.enabled and IsInGroup() and (party.raid or not raid)
+  local wantBuffs = party.enabled and (party.raid or not raid)
+  local wantDispels = DispelsOn()
+  local show = IsInGroup() and (wantBuffs or wantDispels)
   local frames = show and FindFrames(units, raid) or {}
   local needsOf, placeOf = {}, {}
   for _, unit in ipairs(units) do
     local needs = {}
     local frame = frames[unit]
-    if frame and auras[unit] and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit) then
-      local size, limit = SIZE, MAX_PER_UNIT
-      if raid then
-        size, limit = InsideFit(frame)
-      end
+    local size, limit = SIZE, MAX_PER_UNIT
+    if frame and raid then
+      size, limit = InsideFit(frame)
+    end
+    local reachable = frame and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit)
+    if reachable and wantBuffs and auras[unit] then
       local families, extra = FamiliesFor(unit)
       for _, family in ipairs(families) do
         local remaining = Remaining(unit, family)
@@ -933,10 +1009,19 @@ function ns.UpdateParty()
           end
         end
       end
-      if #needs > 0 then
-        GetButton(unit, #needs) -- made here, in group order
-        placeOf[unit] = { frame = frame, size = size, side = SideOf(frame, raid) }
+    end
+    if frame and wantDispels then
+      -- out of combat only the dispels needed now; as combat starts, all of them
+      local list = removable[unit] or {}
+      for _, spell in ipairs(ns.DispelSpells()) do
+        if combatStart or (reachable and list[spell]) then
+          needs[#needs + 1] = { dispel = spell, spell = spell }
+        end
       end
+    end
+    if #needs > 0 then
+      GetButton(unit, #needs) -- made here, in group order
+      placeOf[unit] = { frame = frame, size = size, side = SideOf(frame, raid) }
     end
     needsOf[unit] = needs
   end
@@ -948,6 +1033,7 @@ function ns.UpdateParty()
       local need = needs[slot]
       if need then
         button.family, button.fellBack, button.extra = need.family, need.fellBack, need.extra
+        button.dispel = need.dispel
         ns.ApplyShape(button, ns.IsRound())
         if not (button:IsShown() and button.unit == unit and button.spell == need.spell and button.frame == place.frame
           and button.size == place.size and button.side == place.side) then
@@ -960,7 +1046,7 @@ function ns.UpdateParty()
           button:Show()
         end
       else
-        button.family, button.frame = nil, nil
+        button.family, button.frame, button.dispel = nil, nil, nil
         if button:IsShown() then
           button:Hide()
         end
@@ -978,7 +1064,8 @@ end
 
 local eventFrame = CreateFrame("Frame")
 for _, event in ipairs({
-  "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "SPELLS_CHANGED",
+  "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED",
+  "SPELLS_CHANGED",
   "BAG_UPDATE_DELAYED", "UNIT_AURA", "UNIT_CONNECTION", "UNIT_FLAGS",
 }) do
   pcall(eventFrame.RegisterEvent, eventFrame, event)
@@ -1022,6 +1109,13 @@ eventFrame:SetScript("OnEvent", function(_, event, unit)
   if not ns.db then
     return
   end
+  if event == "PLAYER_REGEN_DISABLED" then
+    -- still allowed while this event runs: the lockdown starts right after it
+    if not InCombatLockdown() and DispelsOn() then
+      ns.UpdateParty(true)
+    end
+    return
+  end
   if event == "UNIT_AURA" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
     if not IsGroupUnit(unit) then
       return
@@ -1056,13 +1150,19 @@ eventFrame:SetScript("OnEvent", function(_, event, unit)
 end)
 
 -- Called from the main tick: refreshes after events, and every second for timers, range and
--- frames that moved.
+-- frames that moved. In combat only once a second, except in a party with dispel buttons: there
+-- right after events, so a debuff shows on its dispel button at once.
 function ns.PartyTick(elapsed)
   sinceRefresh = sinceRefresh + elapsed
   sinceFullScan = sinceFullScan + elapsed
   local raid = IsInRaid and IsInRaid()
-  if (dirty and not InCombatLockdown() and (not raid or sinceRefresh >= RAID_DIRTY_SECONDS))
-    or sinceRefresh >= REFRESH_SECONDS then
+  local soon
+  if raid then
+    soon = not InCombatLockdown() and sinceRefresh >= RAID_DIRTY_SECONDS
+  else
+    soon = not InCombatLockdown() or DispelsOn()
+  end
+  if (dirty and soon) or sinceRefresh >= REFRESH_SECONDS then
     ns.UpdateParty()
   end
 end
@@ -1097,6 +1197,16 @@ function ns.PartyDebug()
     known[#known + 1] = family.key
   end
   Say("buffs you can give: " .. (#known > 0 and table.concat(known, ", ") or "none"))
+  local dispels = {}
+  for _, spell in ipairs(ns.DispelSpells()) do
+    dispels[#dispels + 1] = spell.name .. " (" .. table.concat(spell.typeList, ", ") .. ")"
+  end
+  Say(string.format("dispels you know: %s; party buttons %s, yours %s",
+    #dispels > 0 and table.concat(dispels, ", ") or "none", ns.db.dispel.party and "on" or "off",
+    ns.db.dispel.self and "on" or "off"))
+  local selfShown, selfNames = ns.SelfDispelDebug()
+  Say(string.format("on you: %s (%d buttons)", #selfNames > 0 and table.concat(selfNames, ", ") or "nothing to remove",
+    selfShown))
   for i = 0, 4 do
     local frame = _G["FlareUI_Party" .. i]
     if frame then
@@ -1121,9 +1231,17 @@ function ns.PartyDebug()
         end
       end
       local distance = Distance(unit)
-      Say(string.format("%s %s: frame %s, buffs read %s, %s, blessing from you %s, buttons %d, distance %s%s",
-        unit, GetUnitName(unit, false) or "?", FrameName(frames[unit]), auras[unit] and "yes" or "no",
-        #needs > 0 and table.concat(needs, " ") or "nothing to give", HasMyBlessing(unit) and "yes" or "no", shown,
+      local debuffs = {}
+      for spell, list in pairs(removable[unit] or {}) do
+        for _, debuff in ipairs(list) do
+          debuffs[#debuffs + 1] = debuff.name .. " (" .. debuff.type .. ", " .. spell.name .. ")"
+        end
+      end
+      table.sort(debuffs)
+      Say(string.format("%s %s: frame %s, buffs read %s, %s, blessing from you %s, to remove %s, buttons %d, "
+        .. "distance %s%s", unit, GetUnitName(unit, false) or "?", FrameName(frames[unit]),
+        auras[unit] and "yes" or "no", #needs > 0 and table.concat(needs, " ") or "nothing to give",
+        HasMyBlessing(unit) and "yes" or "no", #debuffs > 0 and table.concat(debuffs, ", ") or "nothing", shown,
         distance and string.format("%d yd", distance) or "unknown", TooFar(unit) and " (too far)" or ""))
     end
   end

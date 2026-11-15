@@ -303,6 +303,7 @@ combatFrame:SetScript("OnEvent", function(_, event)
     -- still allowed while this event runs: the lockdown starts right after it
     if not InCombatLockdown() then
       HideClicks()
+      ns.UpdateSelfDispel(true) -- your dispel buttons, invisible until needed (Dispel.lua)
     end
   elseif ns.db then
     ns.UpdateDisplay()
@@ -416,7 +417,14 @@ function ns.UpdateDisplay()
   anchor:EnableMouse(unlocked)
   mover:SetShown(unlocked)
   LayoutClicks(shown, size)
+  ns.UpdateSelfDispel()
 end
+
+-- For your own dispel buttons (Dispel.lua), placed under the row.
+function ns.RowAnchor()
+  return anchor
+end
+ns.IsRowUnlocked = IsUnlocked
 
 -- Runs a few times per second: counts down, and checks again while the game hides buffs. A timer
 -- that runs out while they're hidden means "unknown", as the buff may have been refreshed.
