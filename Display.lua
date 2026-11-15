@@ -177,10 +177,48 @@ local function GetIcon(index)
   return icon
 end
 
+-- A few quick blinks of the plain icon (never the secure overlay), for "Alert".
+local FLASH_BLINKS = 8
+local function Flash(icon)
+  if not icon.CreateAnimationGroup then
+    return
+  end
+  if not icon.flash then
+    local group = icon:CreateAnimationGroup()
+    local fade = group:CreateAnimation("Alpha")
+    if fade.SetFromAlpha then
+      fade:SetFromAlpha(1)
+      fade:SetToAlpha(0.15)
+    else
+      fade:SetChange(-0.85)
+    end
+    fade:SetDuration(0.2)
+    group:SetLooping("BOUNCE")
+    group:SetScript("OnLoop", function(self)
+      self.blinks = (self.blinks or 0) + 1
+      if self.blinks >= FLASH_BLINKS then
+        self:Stop()
+      end
+    end)
+    icon.flash = group
+  end
+  icon.flash:Stop()
+  icon.flash.blinks = 0
+  icon.flash:Play()
+end
+
 local function ShowClickTooltip(self)
   GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
   GameTooltip:AddLine(self.spellName)
-  GameTooltip:AddLine("Click to cast it on yourself.", 0.6, 0.6, 0.6)
+  local action = self.action
+  if action and action.item then
+    local name = ns.ItemName(action.item) or ("item " .. action.item)
+    local where = action.slot == 17 and " on your off-hand weapon" or action.slot and " on your main-hand weapon" or ""
+    GameTooltip:AddLine(string.format("Click to use %s%s (%d left).", name, where, ns.ItemCount(action.item)),
+      0.6, 0.6, 0.6)
+  else
+    GameTooltip:AddLine("Click to cast it on yourself.", 0.6, 0.6, 0.6)
+  end
   GameTooltip:Show()
 end
 
@@ -215,7 +253,8 @@ local function HideClicks()
   end
 end
 
--- Out of combat only. shown: the entries shown, in icon order.
+-- Out of combat only. shown: the entries shown, in icon order. A click casts the buff's spell
+-- (type spell) or uses its item (type item; on a weapon slot through target-slot).
 local function LayoutClicks(shown, size)
   if InCombatLockdown() then
     return
@@ -224,7 +263,8 @@ local function LayoutClicks(shown, size)
   if not IsUnlocked() and ns.db.clickToCast then
     for index, entry in ipairs(shown) do
       local x, y = icons[index]:GetCenter()
-      if x and ns.KnowsSpell(entry.name) then
+      local action = x and ns.ClickAction(entry)
+      if action then
         used = used + 1
         local click = GetClick(used)
         click:SetSize(size, size)
@@ -233,8 +273,19 @@ local function LayoutClicks(shown, size)
         click:SetFrameStrata(anchor:GetFrameStrata())
         click:SetFrameLevel(icons[index]:GetFrameLevel() + 5)
         ns.ApplyShape(click, ns.IsRound())
-        click:SetAttribute("spell", entry.name)
+        if action.item then
+          click:SetAttribute("type", "item")
+          click:SetAttribute("spell", nil)
+          click:SetAttribute("item", "item:" .. action.item)
+          click:SetAttribute("target-slot", action.slot)
+        else
+          click:SetAttribute("type", "spell")
+          click:SetAttribute("item", nil)
+          click:SetAttribute("target-slot", nil)
+          click:SetAttribute("spell", action.spell)
+        end
         click.spellName = entry.name
+        click.action = action
         click:Show()
       end
     end
@@ -318,7 +369,8 @@ function ns.UpdateDisplay()
     icon:ClearAllPoints()
     icon:SetPoint("CENTER", anchor, "CENTER", (index - (#shown + 1) / 2) * (size + GAP), 0)
     icon.state = state
-    icon.texture:SetTexture(entry.icon or ns.DEFAULT_ICON)
+    icon.entry = entry
+    icon.texture:SetTexture(ns.EntryIcon(entry))
     icon.texture:SetDesaturated(not active)
     -- Missing: ruby border and a ruby stud. Active: gold. Not read yet (may or may not be on): grey.
     icon.stud:SetShown(missing or false)
@@ -332,15 +384,33 @@ function ns.UpdateDisplay()
       ns.SetFrameColor(icon, ns.T.GREY)
       icon.texture:SetVertexColor(0.7, 0.7, 0.7)
     end
-    local count = active and state.count or 0
-    icon.count:SetText(count > 1 and count or "")
+    -- An icon that uses an item shows how many you have: red 0 when it's gone (and no click).
+    local itemID = ns.ItemFor(entry)
+    if itemID then
+      local items = ns.ItemCount(itemID)
+      icon.count:SetText(items)
+      if items > 0 then
+        icon.count:SetTextColor(1, 1, 1)
+      else
+        icon.count:SetTextColor(1, 0.3, 0.3)
+      end
+    else
+      local count = active and state.count or 0
+      icon.count:SetText(count > 1 and count or "")
+      icon.count:SetTextColor(1, 1, 1)
+    end
     UpdateTime(icon)
     icon:Show()
+    if ns.pendingFlash[entry.name:lower()] then
+      Flash(icon)
+    end
   end
   for index = #shown + 1, #icons do
     icons[index].state = nil
+    icons[index].entry = nil
     icons[index]:Hide()
   end
+  ns.pendingFlash = {}
 
   local unlocked = IsUnlocked()
   anchor:EnableMouse(unlocked)
@@ -350,8 +420,17 @@ end
 
 -- Runs a few times per second: counts down, and checks again while the game hides buffs. A timer
 -- that runs out while they're hidden means "unknown", as the buff may have been refreshed.
-local sinceRescan = 0
+local sinceRescan, sinceWeapons = 0, 0
 function ns.Tick(elapsed)
+  -- weapon enchants have no event on every client: read them every second while tracked
+  sinceWeapons = sinceWeapons + elapsed
+  if sinceWeapons >= RESCAN_SECONDS then
+    sinceWeapons = 0
+    if ns.HasWeaponEntries() and ns.ScanWeapons() then
+      ns.UpdateDisplay()
+      return
+    end
+  end
   if not ns.scanComplete then
     sinceRescan = sinceRescan + elapsed
     if sinceRescan >= RESCAN_SECONDS then
@@ -367,9 +446,13 @@ function ns.Tick(elapsed)
 
   local now = GetTime()
   local changed = false
-  for _, state in pairs(ns.state) do
-    if state.active and state.expires and state.expires > 0 and state.expires <= now then
-      state.known = ns.scanComplete
+  for _, entry in ipairs(ns.db.tracked) do
+    local state = ns.StateOf(entry)
+    if state and state.active and state.expires and state.expires > 0 and state.expires <= now then
+      if ns.scanComplete or entry.slot then
+        ns.BuffDropped(entry)
+      end
+      state.known = ns.scanComplete or entry.slot ~= nil
       state.active = false
       state.count = 0
       state.expires = 0

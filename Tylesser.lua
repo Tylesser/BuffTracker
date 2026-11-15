@@ -393,6 +393,38 @@ function T.ShowMoreAddons()
   T.ShowLink(T.SITE_URL, "All Tylesser addons, with their features and changelogs, are on tylesser.com.")
 end
 
+-- Addon compartment ------------------------------------------------------------------------------
+-- The addon menu button by the minimap (Retail and WoW Forever). Registered at run time, so no global
+-- functions are needed; clients without the menu are skipped.
+-- info: text, onClick (function), tooltip (list of lines, optional), icon (optional, defaults to Media/Icon).
+function T.AddCompartment(info)
+  local frame = AddonCompartmentFrame
+  if not (frame and frame.RegisterAddon) then
+    return false
+  end
+  frame:RegisterAddon({
+    text = info.text,
+    icon = info.icon or (MEDIA .. "Icon"),
+    notCheckable = true,
+    registerForAnyClick = true,
+    func = function()
+      info.onClick()
+    end,
+    funcOnEnter = function(button)
+      GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+      GameTooltip:SetText(info.text, T.GOLD[1], T.GOLD[2], T.GOLD[3])
+      for _, line in ipairs(info.tooltip or {}) do
+        GameTooltip:AddLine(line, 1, 1, 1, true)
+      end
+      GameTooltip:Show()
+    end,
+    funcOnLeave = function()
+      GameTooltip:Hide()
+    end,
+  })
+  return true
+end
+
 local function Version()
   local getMetadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   local version = getMetadata and getMetadata(addonName, "Version")

@@ -4,11 +4,12 @@ local _, ns = ...
 -- Left: the tracked buffs. Right: buffs on the character and spells from the spellbook to add.
 
 local ROW_HEIGHT = 26
+local TRACKED_ROW_HEIGHT = 50 -- two lines: name and "when" on top, item and alert below
 local LEFT_WIDTH = 270
 local RIGHT_X = 330
 local RIGHT_WIDTH = 240
 
-local panel, lockCheck, clickCheck, shapeButton, sizeText, searchBox, searchHint, status
+local panel, lockCheck, clickCheck, shapeButton, sizeText, searchBox, searchHint, status, presetButton
 local trackedList, pickerList
 local spellbook = {}
 
@@ -17,7 +18,7 @@ local function SetIcon(texture, icon)
   texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 end
 
-local function CreateList(x, y, width)
+local function CreateList(x, y, width, rowHeight)
   local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", x, y)
   scroll:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", x, 20)
@@ -29,7 +30,7 @@ local function CreateList(x, y, width)
   empty:SetPoint("TOPLEFT", 4, -6)
   empty:SetWidth(width - 8)
   empty:SetJustifyH("LEFT")
-  return { scroll = scroll, content = content, empty = empty, rows = {}, width = width }
+  return { scroll = scroll, content = content, empty = empty, rows = {}, width = width, rowHeight = rowHeight }
 end
 
 local function Finish(list, used, emptyText)
@@ -37,7 +38,7 @@ local function Finish(list, used, emptyText)
     list.rows[index]:Hide()
   end
   list.empty:SetText(used == 0 and emptyText or "")
-  list.content:SetHeight(math.max(used * ROW_HEIGHT, ROW_HEIGHT))
+  list.content:SetHeight(math.max(used * list.rowHeight, list.rowHeight))
 end
 
 local function ModeTooltip(self)
@@ -50,21 +51,63 @@ local function ModeTooltip(self)
   GameTooltip:Show()
 end
 
+local function Hide()
+  GameTooltip:Hide()
+end
+
+local function ItemTooltip(self)
+  local entry = self:GetParent().entry
+  GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+  GameTooltip:AddLine("Item to use")
+  GameTooltip:AddLine("Clicking the icon uses this item, like a food for Well Fed or an elixir.", 1, 1, 1, true)
+  if entry.slot then
+    GameTooltip:AddLine("For a weapon enchant: an oil, poison or sharpening stone, put on this weapon.", 1, 1, 1, true)
+  else
+    GameTooltip:AddLine("Without one, a bag item named after the buff is used when you don't know its spell.",
+      1, 1, 1, true)
+  end
+  GameTooltip:AddLine("Click: next usable item in your bags. Right-click: none.", 0.6, 0.6, 0.6, true)
+  GameTooltip:AddLine("Or type /btrack item " .. entry.name .. " = <item name>", 0.6, 0.6, 0.6, true)
+  GameTooltip:Show()
+end
+
+local function AlertTooltip(self)
+  GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+  GameTooltip:AddLine("Alert")
+  GameTooltip:AddLine("Play a sound and flash the icon when this buff drops during combat.", 1, 1, 1, true)
+  GameTooltip:AddLine("Only works while the game lets addons see your buffs in combat.", 0.6, 0.6, 0.6, true)
+  GameTooltip:Show()
+end
+
+-- "Use: Roasted Quail (4)", "Use: Elixir of the Mongoose (auto)", or "Use item: none".
+local function ItemLabel(entry)
+  local id, auto = ns.ItemFor(entry)
+  if not id then
+    return "Use item: none"
+  end
+  local name = ns.ItemName(id) or ("item " .. id)
+  if auto then
+    return "Use: " .. name .. " (auto)"
+  end
+  return string.format("Use: %s (%d)", name, ns.ItemCount(id))
+end
+
 local function GetTrackedRow(index)
   local row = trackedList.rows[index]
   if row then
     return row
   end
+  local height = trackedList.rowHeight
   row = CreateFrame("Frame", nil, trackedList.content)
-  row:SetSize(trackedList.width, ROW_HEIGHT)
-  row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_HEIGHT)
+  row:SetSize(trackedList.width, height)
+  row:SetPoint("TOPLEFT", 0, -(index - 1) * height)
 
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(22, 22)
-  row.icon:SetPoint("LEFT", 2, 0)
+  row.icon:SetPoint("TOPLEFT", 2, -2)
 
   row.remove = ns.T.Button(row, 22, 22, "X")
-  row.remove:SetPoint("RIGHT", 0, 0)
+  row.remove:SetPoint("TOPRIGHT", 0, -2)
   row.remove:SetScript("OnClick", function(self)
     ns.RemoveBuff(self:GetParent().entry.name)
   end)
@@ -75,15 +118,37 @@ local function GetTrackedRow(index)
     ns.CycleMode(self:GetParent().entry)
   end)
   row.mode:SetScript("OnEnter", ModeTooltip)
-  row.mode:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-  end)
+  row.mode:SetScript("OnLeave", Hide)
 
   row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
   row.name:SetPoint("RIGHT", row.mode, "LEFT", -4, 0)
   row.name:SetJustifyH("LEFT")
   row.name:SetWordWrap(false)
+
+  -- second line: the item a click uses, and the combat alert
+  row.item = ns.T.Button(row, 170, 20)
+  row.item:SetPoint("TOPLEFT", 28, -26)
+  row.item:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  row.item:SetScript("OnClick", function(self, button)
+    local entry = self:GetParent().entry
+    if button == "RightButton" then
+      ns.SetItem(entry, nil)
+    else
+      ns.CycleItem(entry)
+    end
+  end)
+  row.item:SetScript("OnEnter", ItemTooltip)
+  row.item:SetScript("OnLeave", Hide)
+
+  row.alert = ns.T.Check(row, "Alert", "GameFontHighlightSmall")
+  row.alert:SetPoint("LEFT", row.item, "RIGHT", 4, 0)
+  row.alert:SetHitRectInsets(0, -(row.alert.Text:GetStringWidth() + 4), 0, 0)
+  row.alert:SetScript("OnClick", function(self)
+    self:GetParent().entry.alert = self:GetChecked() and true or nil
+  end)
+  row.alert:SetScript("OnEnter", AlertTooltip)
+  row.alert:SetScript("OnLeave", Hide)
 
   trackedList.rows[index] = row
   return row
@@ -114,7 +179,11 @@ local function GetPickerRow(index)
   row.name:SetWordWrap(false)
 
   row:SetScript("OnClick", function(self)
-    ns.AddBuff(self.spellName, self.spellIcon)
+    if self.weaponSlot then
+      ns.AddWeapon(self.weaponSlot)
+    else
+      ns.AddBuff(self.spellName, self.spellIcon)
+    end
   end)
 
   pickerList.rows[index] = row
@@ -126,9 +195,11 @@ local function RefreshTracked()
   for index, entry in ipairs(ns.db.tracked) do
     local row = GetTrackedRow(index)
     row.entry = entry
-    SetIcon(row.icon, entry.icon)
+    SetIcon(row.icon, ns.EntryIcon(entry))
     row.name:SetText(entry.name)
     row.mode:SetText(ns.MODE_LABELS[entry.mode])
+    row.item:SetText(ItemLabel(entry))
+    row.alert:SetChecked(entry.alert or false)
     row:Show()
     used = index
   end
@@ -140,7 +211,7 @@ local function RefreshPicker()
   local used = 0
   local seen = {}
 
-  local function Add(name, icon, tag)
+  local function Add(name, icon, tag, weaponSlot)
     local key = name:lower()
     if seen[key] or ns.IsTracked(name) then
       return
@@ -151,7 +222,7 @@ local function RefreshPicker()
     end
     used = used + 1
     local row = GetPickerRow(used)
-    row.spellName, row.spellIcon = name, icon
+    row.spellName, row.spellIcon, row.weaponSlot = name, icon, weaponSlot
     SetIcon(row.icon, icon)
     row.name:SetText(name)
     row.tag:SetText(tag)
@@ -163,6 +234,9 @@ local function RefreshPicker()
   end
   for _, spell in ipairs(spellbook) do
     Add(spell.name, spell.icon, "")
+  end
+  for _, slot in ipairs(ns.WEAPON_SLOTS) do
+    Add(ns.WEAPON_NAMES[slot], GetInventoryItemTexture and GetInventoryItemTexture("player", slot), "weapon", slot)
   end
   Finish(pickerList, used, "No matches. Press Enter to track this name anyway. It must match the buff's name exactly.")
 
@@ -182,8 +256,24 @@ function ns.RefreshOptions()
   clickCheck:SetChecked(ns.db.clickToCast)
   sizeText:SetText("Icon size: " .. ns.db.iconSize)
   shapeButton:SetText("Shape: " .. (ns.SHAPE_LABELS[ns.db.iconShape] or "Square"))
+  local preset = ns.PresetBuffs()
+  presetButton:SetText("Add " .. (UnitClass("player") or "class") .. " basics")
+  presetButton:SetShown(preset ~= nil)
+  presetButton:SetEnabled(preset ~= nil and #preset > 0)
   RefreshTracked()
   RefreshPicker()
+end
+
+local function PresetTooltip(self)
+  local list = ns.PresetBuffs() or {}
+  GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+  GameTooltip:AddLine(self:GetText())
+  if #list > 0 then
+    GameTooltip:AddLine("Adds: " .. table.concat(list, ", "), 1, 1, 1, true)
+  else
+    GameTooltip:AddLine("You already track the basic buffs of your class that you know.", 1, 1, 1, true)
+  end
+  GameTooltip:Show()
 end
 
 local function AddFromSearchBox()
@@ -244,6 +334,15 @@ function ns.CreateOptions()
   local trackedTitle = ns.T.Heading(panel, "Tracked buffs", LEFT_WIDTH)
   trackedTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 60)
 
+  -- "Add Mage basics": the class buffs you know (Core.lua, ns.PRESETS). Hidden for other classes.
+  presetButton = ns.T.Button(panel, LEFT_WIDTH, 22)
+  presetButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 82)
+  presetButton:SetScript("OnClick", function()
+    ns.AddPreset()
+  end)
+  presetButton:SetScript("OnEnter", PresetTooltip)
+  presetButton:SetScript("OnLeave", Hide)
+
   local addTitle = ns.T.Heading(panel, "Add a buff", RIGHT_WIDTH)
   addTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, top - 60)
 
@@ -265,8 +364,8 @@ function ns.CreateOptions()
   status:SetPoint("TOP", subtitle, "BOTTOM", 0, -3)
   status:SetTextColor(1, 0.6, 0.2)
 
-  trackedList = CreateList(16, top - 84, LEFT_WIDTH)
-  pickerList = CreateList(RIGHT_X, top - 112, RIGHT_WIDTH)
+  trackedList = CreateList(16, top - 112, LEFT_WIDTH, TRACKED_ROW_HEIGHT)
+  pickerList = CreateList(RIGHT_X, top - 112, RIGHT_WIDTH, ROW_HEIGHT)
 
   panel:SetScript("OnShow", function()
     spellbook = ns.GetSpellbook()

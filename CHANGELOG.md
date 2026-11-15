@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+
+- **Consumables:** click an icon to use an item. Items you wear, like trinkets, aren't offered, as a click would equip them. A buff you don't have the spell for, like an elixir or a scroll, uses the bag item of the same name. You can also choose the item yourself for any tracked buff on the options page (for example a food for Well Fed), or with `/btrack item <buff> = <item>`. The icon shows how many you have left.
+- **Weapon enchants:** track your main-hand and off-hand weapon enchant (oils, poisons, sharpening stones), and click the icon to put your chosen item on that weapon.
+- **Alert:** tick Alert under a tracked buff to hear a sound and see its icon flash when it drops during combat.
+- **Raids:** the buff buttons now work for every raid member: small buttons in the top right corner of each raid frame. They hide during combat, so they never catch a click meant for healing. Turn them off with "Buttons on raid frames" on the Party buffs page.
+- **Low reagent warning:** a chat message when a reagent of your group buffs (Arcane Powder, candles, Wild Berries and the like, Symbol of Kings) goes down to 5 or fewer, and the count shows in orange in the button tooltip. Set the number, or turn it off, on the Party buffs page.
+- The reagents match your game version: Wild Quillvine on TBC, Wild Spineleaf and Devout Candle on Wrath, and none from Mists of Pandaria on.
+- **Class basics:** a button on the options page (and `/btrack basics`) tracks the basic buffs of your class that you know, like Arcane Intellect and your best armor for mages.
+- Buff Tracker is in the addon menu by the minimap, on clients that have it.
+
 ## 1.3.1
 
 - A **More addons** button on the options page, and the feedback window points to tylesser.com for the other Tylesser addons.

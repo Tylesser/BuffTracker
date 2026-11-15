@@ -1,15 +1,26 @@
 local _, ns = ...
 
--- Buttons next to the party frames for group buffs a member is missing. Clicking one casts the
--- buff on that member. They are secure buttons: the game doesn't let addons show, hide, move or
--- change them in combat, so all of that happens out of combat. In combat they keep working as
--- they were, and a buff that lands on the member only dims its button.
+-- Buttons next to the party frames (in a raid: small, in a corner of the raid frames) for group
+-- buffs a member is missing. Clicking one casts the buff on that member. They are secure buttons:
+-- the game doesn't let addons show, hide, move or change them in combat, so all of that happens
+-- out of combat. In combat party buttons keep working as they were, and a buff that lands on the
+-- member only dims its button. Raid buttons sit on a secure holder that the game itself hides in
+-- combat (a state driver), so they never catch a click meant for healing. Buttons are made only
+-- when first needed (out of combat), as each one costs memory.
 
 local SIZE = 24
+local RAID_MIN_SIZE, RAID_MAX_SIZE = 12, 14 -- buttons in a raid frame's corner
+local RAID_WIDTH_SHARE = 1 / 3 -- they take at most about this much of the raid frame's width
 local GAP = 2
 local MAX_PER_UNIT = 8 -- group buffs and, with "every blessing", up to six blessings
 local REFRESH_SECONDS = 1
-local UNITS = { "player", "party1", "party2", "party3", "party4" }
+local RAID_DIRTY_SECONDS = 0.5 -- in a raid, events come often: lay out at most this often
+local RAID_FULL_SCAN_SECONDS = 5 -- in a raid, buffs are read on UNIT_AURA, and all of them this often
+local PARTY_UNITS = { "player", "party1", "party2", "party3", "party4" }
+local RAID_UNITS = {}
+for i = 1, 40 do
+  RAID_UNITS[i] = "raid" .. i
+end
 local NO_MANA = { WARRIOR = true, ROGUE = true, DEATHKNIGHT = true, DEMONHUNTER = true }
 -- How often to look through all frames for a member whose frame wasn't found. Each search that
 -- finds nothing doubles the wait, up to the maximum; group changes start again at the minimum.
@@ -30,24 +41,44 @@ end
 -- "Hide when farther than": the choices, in yards.
 ns.RANGE_CHOICES = { 30, 40, 60, 80, 100 }
 ns.DEFAULT_RANGE_YARDS = 60
+-- "Warn when reagents drop to": the choices; 0 is off.
+ns.REAGENT_CHOICES = { 0, 1, 3, 5, 10, 20 }
+ns.DEFAULT_REAGENT_WARN = 5
+
 local SIGHT_YARDS = 100 -- about how far the game shows other players: farther, UnitIsVisible is false
 local UNIT_IN_RANGE_YARDS = 40 -- about what UnitInRange checks
 
 -- Yards between you and the unit, or nil when the game doesn't tell (in instances, on another
 -- map, or when positions are hidden from addons).
+-- Run with pcall: positions can be hidden from addons (secret values), and comparing or adding
+-- those raises an error.
+local function DistanceOrError(unit)
+  local y1, x1, _, map1 = UnitPosition("player")
+  local y2, x2, _, map2 = UnitPosition(unit)
+  if not (y1 and y2) or map1 ~= map2 then
+    return nil
+  end
+  return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+end
+
 local function Distance(unit)
   if not UnitPosition then
     return nil
   end
-  local ok, distance = pcall(function()
-    local y1, x1, _, map1 = UnitPosition("player")
-    local y2, x2, _, map2 = UnitPosition(unit)
-    if not (y1 and y2) or map1 ~= map2 then
-      return nil
-    end
-    return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
-  end)
+  local ok, distance = pcall(DistanceOrError, unit)
   return ok and distance or nil
+end
+
+-- Without a position: whether UnitIsVisible or UnitInRange prove the unit is past the limit.
+local function FarBySight(unit, limit)
+  if limit <= SIGHT_YARDS and UnitIsVisible and not UnitIsVisible(unit) then
+    return true
+  end
+  if limit <= UNIT_IN_RANGE_YARDS and UnitInRange then
+    local inRange, checked = UnitInRange(unit)
+    return checked and not inRange
+  end
+  return false
 end
 
 -- Whether the unit is past the distance limit. Without a position the game only tells whether
@@ -63,16 +94,7 @@ local function TooFar(unit)
   if distance then
     return distance > limit
   end
-  local ok, far = pcall(function()
-    if limit <= SIGHT_YARDS and UnitIsVisible and not UnitIsVisible(unit) then
-      return true
-    end
-    if limit <= UNIT_IN_RANGE_YARDS and UnitInRange then
-      local inRange, checked = UnitInRange(unit)
-      return checked and not inRange
-    end
-    return false
-  end)
+  local ok, far = pcall(FarBySight, unit, limit)
   return ok and far or false
 end
 
@@ -87,27 +109,43 @@ local function EndsSoon(remaining)
   return seconds ~= nil and remaining < seconds
 end
 
+-- Reagent item IDs differ per game version (interface number from GetBuildInfo). Classic Era and
+-- WoW Forever: Arcane Powder, Sacred/Holy Candle, Wild Thornroot/Berries, Symbol of Kings. TBC: Gift
+-- of the Wild takes Wild Quillvine. Wrath: Wild Spineleaf, and Devout Candle for the Prayers. MoP
+-- and later: these spells take no reagents.
+local INTERFACE = select(4, GetBuildInfo()) or 0
+local REAGENTS = {
+  powder = { 17020 }, candles = { 17029, 17028 }, sacred = { 17029 }, wild = { 17026, 17021 }, symbol = { 21177 },
+}
+if INTERFACE >= 50000 then
+  REAGENTS = {}
+elseif INTERFACE >= 30000 then
+  REAGENTS.candles, REAGENTS.sacred, REAGENTS.wild = { 44615 }, { 44615 }, { 44605 }
+elseif INTERFACE >= 20000 then
+  REAGENTS.wild = { 22148 }
+end
+
 -- Buffs you can give your group. The first spell is preferred; when it can't be cast (usually a
 -- missing reagent) the next one is used. Any of the spells counts as having the buff.
--- English spell names; reagent item IDs are only shown in the tooltip.
+-- English spell names; reagent item IDs are only for the tooltip and the low reagent warning.
 ns.GROUP_BUFFS = {
   { key = "intellect", manaOnly = true, spells = {
-    { name = "Arcane Brilliance", reagents = { 17020 } }, { name = "Arcane Intellect" } } },
+    { name = "Arcane Brilliance", reagents = REAGENTS.powder }, { name = "Arcane Intellect" } } },
   { key = "fortitude", spells = {
-    { name = "Prayer of Fortitude", reagents = { 17029, 17028 } }, { name = "Power Word: Fortitude" } } },
+    { name = "Prayer of Fortitude", reagents = REAGENTS.candles }, { name = "Power Word: Fortitude" } } },
   { key = "spirit", manaOnly = true, spells = {
-    { name = "Prayer of Spirit", reagents = { 17029 } }, { name = "Divine Spirit" } } },
+    { name = "Prayer of Spirit", reagents = REAGENTS.sacred }, { name = "Divine Spirit" } } },
   { key = "shadow", spells = {
-    { name = "Prayer of Shadow Protection", reagents = { 17029 } }, { name = "Shadow Protection" } } },
+    { name = "Prayer of Shadow Protection", reagents = REAGENTS.sacred }, { name = "Shadow Protection" } } },
   { key = "wild", spells = {
-    { name = "Gift of the Wild", reagents = { 17026, 17021 } }, { name = "Mark of the Wild" } } },
+    { name = "Gift of the Wild", reagents = REAGENTS.wild }, { name = "Mark of the Wild" } } },
 }
 
 -- Paladin blessings: one per member, chosen by class or per member in the options.
 ns.BLESSINGS = {}
 for _, blessing in ipairs({ "Might", "Wisdom", "Kings", "Salvation", "Light", "Sanctuary" }) do
   table.insert(ns.BLESSINGS, { key = blessing:lower(), label = blessing, blessing = true, spells = {
-    { name = "Greater Blessing of " .. blessing, reagents = { 21177 } }, { name = "Blessing of " .. blessing } } })
+    { name = "Greater Blessing of " .. blessing, reagents = REAGENTS.symbol }, { name = "Blessing of " .. blessing } } })
 end
 ns.DEFAULT_BLESSINGS = {
   WARRIOR = "might", ROGUE = "might", HUNTER = "might", DEATHKNIGHT = "might",
@@ -175,31 +213,99 @@ function ns.BlessingFor(unit)
   return key
 end
 
-function ns.ReagentCount(spell)
-  local count = 0
-  local GetCount = (C_Item and C_Item.GetItemCount) or GetItemCount
-  for _, id in ipairs(spell.reagents or {}) do
-    count = count + (GetCount(id) or 0)
+local function IsUsable(name)
+  if C_Spell and C_Spell.IsSpellUsable then
+    return C_Spell.IsSpellUsable(name)
   end
-  return count
+  return IsUsableSpell(name)
 end
 
-function ns.ReagentName(spell)
-  local id = spell.reagents and spell.reagents[1]
-  if not id then
-    return nil
-  end
+local function ItemCount(id)
+  local GetCount = (C_Item and C_Item.GetItemCount) or GetItemCount
+  return GetCount(id) or 0
+end
+
+local function ItemName(id)
   if C_Item and C_Item.GetItemNameByID then
     return C_Item.GetItemNameByID(id)
   end
   return (GetItemInfo(id))
 end
 
-local function IsUsable(name)
-  if C_Spell and C_Spell.IsSpellUsable then
-    return C_Spell.IsSpellUsable(name)
+function ns.ReagentCount(spell)
+  local count = 0
+  for _, id in ipairs(spell.reagents or {}) do
+    count = count + ItemCount(id)
   end
-  return IsUsableSpell(name)
+  return count
+end
+
+function ns.ReagentName(spell)
+  local id = spell.reagents and spell.reagents[1]
+  return id and ItemName(id) or nil
+end
+
+-- Whether none is left, yet the game says the spell can be cast: then our item IDs are wrong for
+-- this client (or the spell needs no reagent here), and nothing should be flagged.
+local function CastsWithout(spell, count)
+  return count == 0 and IsUsable(spell.name) and true or false
+end
+
+-- Whether the spell's reagent count is at or below the warning level (off: never).
+function ns.ReagentLow(spell)
+  local limit = ns.db.party.reagentWarn or 0
+  if not spell.reagents or limit <= 0 then
+    return false
+  end
+  local count = ns.ReagentCount(spell)
+  return count <= limit and not CastsWithout(spell, count)
+end
+
+-- Low reagent warning: one chat line each time a reagent you use drops to a new lower count at or
+-- below the limit. The first count seen is only remembered, so logging in with few doesn't warn.
+-- Watched per item ID, so a candle used by three Prayers is one line.
+local reagentSeen = {} -- item ID -> last count
+
+local function WatchedReagents()
+  local list, byID = {}, {}
+  local function Watch(families)
+    for _, family in ipairs(families) do
+      for _, spell in ipairs(family.spells) do
+        if spell.reagents and ns.FamilyEnabled(family) and ns.KnowsSpell(spell.name) then
+          for _, id in ipairs(spell.reagents) do
+            local watched = byID[id]
+            if not watched then
+              watched = { id = id, spells = {} }
+              byID[id] = watched
+              list[#list + 1] = watched
+            end
+            watched.spells[#watched.spells + 1] = spell
+          end
+        end
+      end
+    end
+  end
+  Watch(ns.GROUP_BUFFS)
+  Watch(ns.BLESSINGS)
+  return list
+end
+
+function ns.CheckReagents()
+  local limit = ns.db.party.reagentWarn or 0
+  for _, watched in ipairs(WatchedReagents()) do
+    local count = ItemCount(watched.id)
+    local last = reagentSeen[watched.id]
+    if last and count < last and limit > 0 and count <= limit then
+      local castsAnyway = false
+      for _, spell in ipairs(watched.spells) do
+        castsAnyway = castsAnyway or CastsWithout(spell, count)
+      end
+      if not castsAnyway then
+        print(ns.PREFIX .. count .. " " .. (ItemName(watched.id) or ("item " .. watched.id)) .. " left.")
+      end
+    end
+    reagentSeen[watched.id] = count
+  end
 end
 
 local function SpellIcon(name)
@@ -362,46 +468,70 @@ end
 -- frames, raid frames (your own group), ElvUI and FlareUI. Any other unit frame addon is found by
 -- the search further down. The player's own PlayerFrame isn't used: the icon row covers your own
 -- buffs.
-local function CandidateFrames()
-  local list = {}
-  local function Add(frame)
-    if frame and frame.IsVisible then
-      list[#list + 1] = frame
+-- The frame names, built once: in the order they're checked, party first.
+local PARTY_FRAME_NAMES, RAID_FRAME_NAMES = {}, {}
+for i = 1, 5 do
+  PARTY_FRAME_NAMES[#PARTY_FRAME_NAMES + 1] = "CompactPartyFrameMember" .. i
+end
+for i = 1, 4 do
+  PARTY_FRAME_NAMES[#PARTY_FRAME_NAMES + 1] = "PartyMemberFrame" .. i
+end
+local POOL_SLOT = #PARTY_FRAME_NAMES -- Blizzard's party frame pool comes after these
+for i = 1, 5 do
+  PARTY_FRAME_NAMES[#PARTY_FRAME_NAMES + 1] = "ElvUF_PartyGroup1UnitButton" .. i
+end
+for i = 0, 4 do
+  PARTY_FRAME_NAMES[#PARTY_FRAME_NAMES + 1] = "FlareUI_Party" .. i
+end
+for group = 1, 8 do
+  for member = 1, 5 do
+    PARTY_FRAME_NAMES[#PARTY_FRAME_NAMES + 1] = "CompactRaidGroup" .. group .. "Member" .. member
+  end
+end
+for i = 1, 40 do
+  PARTY_FRAME_NAMES[#PARTY_FRAME_NAMES + 1] = "CompactRaidFrame" .. i
+end
+for group = 1, 8 do
+  for member = 1, 5 do
+    for _, prefix in ipairs({ "ElvUF_Raid1Group", "ElvUF_Raid2Group", "ElvUF_Raid3Group", "ElvUF_RaidGroup" }) do
+      RAID_FRAME_NAMES[#RAID_FRAME_NAMES + 1] = prefix .. group .. "UnitButton" .. member
     end
   end
-  for i = 1, 5 do
-    Add(_G["CompactPartyFrameMember" .. i])
-  end
-  for i = 1, 4 do
-    Add(_G["PartyMemberFrame" .. i])
-  end
+end
+
+local function AddPool(list)
   local pool = PartyFrame and PartyFrame.PartyMemberFramePool
   if pool and pool.EnumerateActive then
     pcall(function()
       for frame in pool:EnumerateActive() do
-        Add(frame)
+        list[#list + 1] = frame
       end
     end)
   end
-  for i = 1, 5 do
-    Add(_G["ElvUF_PartyGroup1UnitButton" .. i])
-  end
-  for i = 0, 4 do
-    Add(_G["FlareUI_Party" .. i])
-  end
-  for group = 1, 8 do
-    for member = 1, 5 do
-      Add(_G["CompactRaidGroup" .. group .. "Member" .. member])
+end
+
+local function CandidateFrames(raid)
+  local list = {}
+  local function AddNames(names)
+    for index, name in ipairs(names) do
+      local frame = _G[name]
+      if type(frame) == "table" and frame.IsVisible then
+        list[#list + 1] = frame
+      end
+      if names == PARTY_FRAME_NAMES and index == POOL_SLOT then
+        AddPool(list)
+      end
     end
   end
-  for i = 1, 40 do
-    Add(_G["CompactRaidFrame" .. i])
+  AddNames(PARTY_FRAME_NAMES)
+  if raid then
+    AddNames(RAID_FRAME_NAMES)
   end
   return list
 end
 
 local ownButtons = {} -- our own buttons have a unit too: never anchor to them
-local found = {}       -- party unit -> frame found by the search
+local found = {}       -- group unit -> frame found by the search
 local nextSearch, searchWait = 0, SEARCH_SECONDS
 
 local function ResetSearch()
@@ -431,19 +561,30 @@ local function IsMatch(frame, unit)
 end
 
 -- Looks through every frame for the members not found yet. That's slow, so it waits between
--- searches, and a frame found is kept for as long as it still shows that member.
-local function SearchFrames(missing)
+-- searches, and a frame found is kept for as long as it still shows that member. In a party, a
+-- raid-style frame may show a member as raidN; in a raid every member is raidN already.
+local function SearchFrames(missing, raid)
   if not EnumerateFrames or GetTime() < nextSearch then
     return
   end
   local foundAny = false
   local frame = EnumerateFrames()
   while frame do
-    if frame.GetAttribute then
-      for unit in pairs(missing) do
-        if not found[unit] and IsMatch(frame, unit) then
-          found[unit] = frame
-          foundAny = true
+    if frame.GetAttribute and not ownButtons[frame] then
+      local ok, frameUnit = pcall(frame.GetAttribute, frame, "unit")
+      if ok and type(frameUnit) == "string" then
+        if missing[frameUnit] then
+          if not found[frameUnit] and IsMatch(frame, frameUnit) then
+            found[frameUnit] = frame
+            foundAny = true
+          end
+        elseif not raid and frameUnit:find("^raid%d+$") then
+          for unit in pairs(missing) do
+            if not found[unit] and IsMatch(frame, unit) then
+              found[unit] = frame
+              foundAny = true
+            end
+          end
         end
       end
     end
@@ -453,25 +594,36 @@ local function SearchFrames(missing)
   nextSearch = GetTime() + searchWait
 end
 
-local function FindFrames()
-  local frames = {}
-  for _, frame in ipairs(CandidateFrames()) do
+-- units: the group's unit IDs (GroupUnits). Returns unit -> frame.
+local function FindFrames(units, raid)
+  local frames, wanted = {}, {}
+  for _, unit in ipairs(units) do
+    if UnitExists(unit) then
+      wanted[unit] = true
+    end
+  end
+  for _, frame in ipairs(CandidateFrames(raid)) do
     if frame:IsVisible() then
       local frameUnit = FrameUnit(frame)
       if frameUnit and UnitExists(frameUnit) then
-        for _, unit in ipairs(UNITS) do
-          if not frames[unit] and UnitExists(unit) and UnitIsUnit(frameUnit, unit) then
-            frames[unit] = frame
+        if wanted[frameUnit] then
+          frames[frameUnit] = frames[frameUnit] or frame
+        else
+          -- the frame shows the person by another unit ID (raidN in a party, partyN in a raid)
+          for _, unit in ipairs(units) do
+            if wanted[unit] and not frames[unit] and UnitIsUnit(frameUnit, unit) then
+              frames[unit] = frame
+            end
           end
         end
       end
     end
   end
 
-  -- Any other party frame addon: party members only, your own frame is left out.
+  -- Any other unit frame addon: members only, your own frame is left out.
   local missing = {}
-  for _, unit in ipairs(UNITS) do
-    if unit ~= "player" and not frames[unit] and UnitExists(unit) then
+  for _, unit in ipairs(units) do
+    if wanted[unit] and not frames[unit] and unit ~= "player" and not UnitIsUnit(unit, "player") then
       local frame = found[unit]
       if frame and IsMatch(frame, unit) then
         frames[unit] = frame
@@ -482,7 +634,7 @@ local function FindFrames()
     end
   end
   if next(missing) then
-    SearchFrames(missing)
+    SearchFrames(missing, raid)
     for unit in pairs(missing) do
       frames[unit] = found[unit]
     end
@@ -492,8 +644,24 @@ end
 
 -- Buttons --------------------------------------------------------------------------------------
 
-local buttons = {} -- buttons[unit index][1..MAX_PER_UNIT]
-local dirty, sinceRefresh = true, 0
+local buttons = {} -- buttons[unit][slot], made when first needed
+local raidHolder   -- parent of the raid buttons, hidden by the game in combat
+local ready = false
+local dirty, sinceRefresh, sinceFullScan = true, 0, 0
+local stale, rescanAll = {}, true -- in a raid: units whose buffs changed since the last read
+
+-- The group's unit IDs: player and party1-4, or in a raid raid1 to raidN. Also whether it's a raid.
+local function GroupUnits()
+  if IsInRaid and IsInRaid() then
+    local list = {}
+    local count = math.min(GetNumGroupMembers and GetNumGroupMembers() or 0, #RAID_UNITS)
+    for i = 1, count do
+      list[i] = RAID_UNITS[i]
+    end
+    return list, true
+  end
+  return PARTY_UNITS, false
+end
 
 local function ShowTooltip(self)
   if not self.family then
@@ -513,7 +681,12 @@ local function ShowTooltip(self)
     GameTooltip:AddLine("Missing on " .. who .. ".", 1, 0.3, 0.3)
   end
   if self.spell.reagents then
-    GameTooltip:AddLine((ns.ReagentName(self.spell) or "Reagent") .. ": " .. ns.ReagentCount(self.spell), 1, 1, 1)
+    local line = (ns.ReagentName(self.spell) or "Reagent") .. ": " .. ns.ReagentCount(self.spell)
+    if ns.ReagentLow(self.spell) then
+      GameTooltip:AddLine(line .. " (running low)", 1, 0.6, 0.2)
+    else
+      GameTooltip:AddLine(line, 1, 1, 1)
+    end
   end
   if self.fellBack then
     local preferred = self.family.spells[1]
@@ -531,8 +704,20 @@ local function ShowTooltip(self)
   GameTooltip:Show()
 end
 
-local function CreateButton()
-  local button = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
+-- Out of combat only. A secure frame whose visibility the game sets itself: hidden in combat,
+-- shown otherwise. Raid buttons cover part of the raid frames, and a healer clicking there in
+-- combat must reach the raid frame, not cast a buff.
+local function RaidHolder()
+  if not raidHolder then
+    raidHolder = CreateFrame("Frame", nil, UIParent, "SecureHandlerStateTemplate")
+    raidHolder:SetAllPoints(UIParent)
+    RegisterStateDriver(raidHolder, "visibility", "[combat] hide; show")
+  end
+  return raidHolder
+end
+
+local function CreateButton(parent)
+  local button = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
   button:SetSize(SIZE, SIZE)
   -- Newer clients run secure clicks on key down or up depending on a setting; they need both.
   local useKeyDown = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar("ActionButtonUseKeyDown") ~= nil
@@ -563,6 +748,21 @@ local function CreateButton()
   return button
 end
 
+-- Out of combat only: makes the unit's buttons up to slot.
+local function GetButton(unit, slot)
+  local row = buttons[unit]
+  if not row then
+    row = {}
+    buttons[unit] = row
+  end
+  local parent = unit:find("^raid") and RaidHolder() or UIParent
+  for index = #row + 1, slot do
+    row[index] = CreateButton(parent)
+    row[index].slot = index
+  end
+  return row[slot]
+end
+
 function ns.SetupParty()
   local party = ns.db.party or {}
   ns.db.party = party
@@ -584,18 +784,17 @@ function ns.SetupParty()
   party.off = party.off or {}
   party.classes = party.classes or {}
   party.members = party.members or {}
-  for index = 1, #UNITS do
-    buttons[index] = {}
-    for slot = 1, MAX_PER_UNIT do
-      buttons[index][slot] = CreateButton()
-    end
+  party.reagentWarn = party.reagentWarn or ns.DEFAULT_REAGENT_WARN
+  if party.raid == nil then
+    party.raid = true
   end
+  ready = true
   ns.RefreshKnown()
 end
 
 -- Colors only: allowed in combat.
 local function UpdateLooks()
-  for _, row in ipairs(buttons) do
+  for _, row in pairs(buttons) do
     for _, button in ipairs(row) do
       if button:IsShown() and button.family then
         local unit, spell = button.unit, button.spell
@@ -606,10 +805,16 @@ local function UpdateLooks()
         end
         local _, noMana = IsUsable(spell.name)
         local reachable = UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and InRange(spell.name, unit)
-        button.icon:SetDesaturated(done or false)
+        -- secure group frames can reshuffle in combat: the frame may now show someone else
+        local frameUnit = button.frame and FrameUnit(button.frame)
+        local moved = frameUnit ~= nil and frameUnit ~= unit and not UnitIsUnit(frameUnit, unit)
+        button.icon:SetDesaturated(done or moved or false)
         if TooFar(unit) then
           -- only in combat, when the button can't be hidden: invisible until they come back
           button:SetAlpha(0)
+        elseif moved then
+          button:SetAlpha(0.25)
+          ns.SetFrameColor(button, ns.T.GREY)
         elseif done then
           button:SetAlpha(0.4)
           ns.SetFrameColor(button, ns.T.GREY)
@@ -629,41 +834,77 @@ local function UpdateLooks()
   end
 end
 
-local function PlaceRow(row, frame, count)
+-- Size of the buttons in a raid frame's corner, and how many fit in about a third of its width.
+local function InsideFit(frame)
+  local ok, width, height = pcall(frame.GetSize, frame)
+  width, height = ok and width or 0, ok and height or 0
+  local size = math.min(math.max(math.floor(height * 0.35), RAID_MIN_SIZE), RAID_MAX_SIZE)
+  local fits = math.floor((width * RAID_WIDTH_SHARE + GAP) / (size + GAP))
+  return size, math.max(math.min(fits, MAX_PER_UNIT), 1)
+end
+
+-- Where a unit's buttons go: beside the frame, on the side facing the middle of the screen
+-- ("left"/"right"), or in a raid frame's top right corner ("corner", frames sit side by side).
+local function SideOf(frame, raid)
+  if raid then
+    return "corner"
+  end
   local frameX = (frame:GetCenter() or 0) * frame:GetEffectiveScale()
   local screenX = UIParent:GetCenter() * UIParent:GetEffectiveScale()
-  local onRight = frameX < screenX -- buttons go on the side facing the middle of the screen
-  for slot = 1, count do
-    local button = row[slot]
-    button:ClearAllPoints()
+  return frameX < screenX and "right" or "left"
+end
+
+local function PlaceButton(row, slot, frame, side, size)
+  local button = row[slot]
+  button:SetSize(size, size)
+  button:ClearAllPoints()
+  if side == "corner" then
     if slot == 1 then
-      if onRight then
-        button:SetPoint("LEFT", frame, "RIGHT", GAP, 0)
-      else
-        button:SetPoint("RIGHT", frame, "LEFT", -GAP, 0)
-      end
-    elseif onRight then
-      button:SetPoint("LEFT", row[slot - 1], "RIGHT", GAP, 0)
+      button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
     else
-      button:SetPoint("RIGHT", row[slot - 1], "LEFT", -GAP, 0)
+      button:SetPoint("RIGHT", row[slot - 1], "LEFT", -1, 0)
     end
-    button:SetFrameStrata(frame:GetFrameStrata())
-    button:SetFrameLevel(frame:GetFrameLevel() + 10)
+  elseif slot == 1 then
+    if side == "right" then
+      button:SetPoint("LEFT", frame, "RIGHT", GAP, 0)
+    else
+      button:SetPoint("RIGHT", frame, "LEFT", -GAP, 0)
+    end
+  elseif side == "right" then
+    button:SetPoint("LEFT", row[slot - 1], "RIGHT", GAP, 0)
+  else
+    button:SetPoint("RIGHT", row[slot - 1], "LEFT", -GAP, 0)
   end
+  button:SetFrameStrata(frame:GetFrameStrata())
+  button:SetFrameLevel(frame:GetFrameLevel() + 10)
 end
 
 function ns.UpdateParty()
-  if not (ns.db and buttons[1]) then
+  if not (ns.db and ready) then
     return
   end
   dirty, sinceRefresh = false, 0
-  for _, unit in ipairs(UNITS) do
-    if UnitExists(unit) then
-      ScanUnit(unit)
-    else
+  local units, raid = GroupUnits()
+  local inGroup = {}
+  -- In a party every member is read each time. In a raid only those with new buffs, and every
+  -- member now and then.
+  if sinceFullScan >= RAID_FULL_SCAN_SECONDS then
+    rescanAll, sinceFullScan = true, 0
+  end
+  for _, unit in ipairs(units) do
+    inGroup[unit] = true
+    if not UnitExists(unit) then
       auras[unit] = nil
+    elseif not raid or rescanAll or stale[unit] or not auras[unit] then
+      ScanUnit(unit)
     end
   end
+  for unit in pairs(auras) do
+    if not inGroup[unit] then
+      auras[unit], fromMe[unit] = nil, nil
+    end
+  end
+  stale, rescanAll = {}, false
   if InCombatLockdown() then
     dirty = true -- lay out again when combat ends
     UpdateLooks()
@@ -671,40 +912,59 @@ function ns.UpdateParty()
   end
 
   local party = ns.db.party
-  local frames = (party.enabled and IsInGroup()) and FindFrames() or {}
-  for index, unit in ipairs(UNITS) do
+  local show = party.enabled and IsInGroup() and (party.raid or not raid)
+  local frames = show and FindFrames(units, raid) or {}
+  local needsOf, placeOf = {}, {}
+  for _, unit in ipairs(units) do
     local needs = {}
     local frame = frames[unit]
     if frame and auras[unit] and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit) then
+      local size, limit = SIZE, MAX_PER_UNIT
+      if raid then
+        size, limit = InsideFit(frame)
+      end
       local families, extra = FamiliesFor(unit)
       for _, family in ipairs(families) do
         local remaining = Remaining(unit, family)
         if remaining == nil or (EndsSoon(remaining) and not extra[family]) then
           local spell, fellBack = ns.ChooseSpell(family)
-          if spell and #needs < MAX_PER_UNIT then
+          if spell and #needs < limit then
             needs[#needs + 1] = { family = family, spell = spell, fellBack = fellBack, extra = extra[family] }
           end
         end
       end
+      if #needs > 0 then
+        GetButton(unit, #needs) -- made here, in group order
+        placeOf[unit] = { frame = frame, size = size, side = SideOf(frame, raid) }
+      end
     end
-    local row = buttons[index]
+    needsOf[unit] = needs
+  end
+  -- Every row, also those of units no longer in the group (their buttons hide). Attributes and
+  -- points are set only when something changed: unit, spell, frame, size or side.
+  for unit, row in pairs(buttons) do
+    local needs, place = needsOf[unit] or {}, placeOf[unit]
     for slot, button in ipairs(row) do
       local need = needs[slot]
       if need then
-        button.unit, button.family, button.spell, button.fellBack = unit, need.family, need.spell, need.fellBack
-        button.extra = need.extra
+        button.family, button.fellBack, button.extra = need.family, need.fellBack, need.extra
         ns.ApplyShape(button, ns.IsRound())
-        button:SetAttribute("unit", unit)
-        button:SetAttribute("spell", need.spell.name)
-        button.icon:SetTexture(SpellIcon(need.spell.name) or ns.DEFAULT_ICON)
-        button:Show()
+        if not (button:IsShown() and button.unit == unit and button.spell == need.spell and button.frame == place.frame
+          and button.size == place.size and button.side == place.side) then
+          button.unit, button.spell, button.frame = unit, need.spell, place.frame
+          button.size, button.side = place.size, place.side
+          button:SetAttribute("unit", unit)
+          button:SetAttribute("spell", need.spell.name)
+          button.icon:SetTexture(SpellIcon(need.spell.name) or ns.DEFAULT_ICON)
+          PlaceButton(row, slot, place.frame, place.side, place.size)
+          button:Show()
+        end
       else
-        button.family = nil
-        button:Hide()
+        button.family, button.frame = nil, nil
+        if button:IsShown() then
+          button:Hide()
+        end
       end
-    end
-    if #needs > 0 then
-      PlaceRow(row, frame, #needs)
     end
   end
   UpdateLooks()
@@ -723,20 +983,72 @@ for _, event in ipairs({
 }) do
   pcall(eventFrame.RegisterEvent, eventFrame, event)
 end
+local function IsGroupUnit(unit)
+  return type(unit) == "string" and (unit == "player" or unit:find("^party%d$") or unit:find("^raid%d+$")) ~= nil
+end
+
+-- In a raid, buffs are read again only for members with UNIT_AURA. An event for "player" or
+-- partyN marks that person's raidN too, from a map made once per roster change.
+local raidOf = {}
+local rosterSize
+
+local function MapRaidUnits()
+  raidOf = {}
+  if not (IsInRaid and IsInRaid()) then
+    return
+  end
+  local count = math.min(GetNumGroupMembers and GetNumGroupMembers() or 0, #RAID_UNITS)
+  for _, unit in ipairs(PARTY_UNITS) do
+    if UnitExists(unit) then
+      for i = 1, count do
+        if UnitIsUnit(RAID_UNITS[i], unit) then
+          raidOf[unit] = RAID_UNITS[i]
+          break
+        end
+      end
+    end
+  end
+end
+
+local function MarkStale(unit)
+  stale[unit] = true
+  local raidUnit = raidOf[unit]
+  if raidUnit then
+    stale[raidUnit] = true
+  end
+end
+
 eventFrame:SetScript("OnEvent", function(_, event, unit)
   if not ns.db then
     return
   end
-  if (event == "UNIT_AURA" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS")
-    and not (unit == "player" or (type(unit) == "string" and unit:find("^party%d$"))) then
-    return
+  if event == "UNIT_AURA" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
+    if not IsGroupUnit(unit) then
+      return
+    end
+    if event == "UNIT_AURA" then
+      MarkStale(unit)
+    end
   end
   if event == "SPELLS_CHANGED" then
     ns.RefreshKnown()
   end
+  if event == "SPELLS_CHANGED" or event == "BAG_UPDATE_DELAYED" then
+    ns.CheckReagents()
+  end
   dirty = true
+  if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" then
+    rescanAll = true
+  end
   if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
-    ResetSearch()
+    MapRaidUnits()
+    -- In a raid the roster changes often (people move between groups): the slow frame search
+    -- keeps its growing wait unless the raid got bigger or smaller.
+    local size = GetNumGroupMembers and GetNumGroupMembers() or 0
+    if event == "PLAYER_ENTERING_WORLD" or not (IsInRaid and IsInRaid()) or size ~= rosterSize then
+      ResetSearch()
+    end
+    rosterSize = size
   end
   if event == "GROUP_ROSTER_UPDATE" then
     ns.RefreshPartyOptions()
@@ -747,7 +1059,10 @@ end)
 -- frames that moved.
 function ns.PartyTick(elapsed)
   sinceRefresh = sinceRefresh + elapsed
-  if (dirty and not InCombatLockdown()) or sinceRefresh >= REFRESH_SECONDS then
+  sinceFullScan = sinceFullScan + elapsed
+  local raid = IsInRaid and IsInRaid()
+  if (dirty and not InCombatLockdown() and (not raid or sinceRefresh >= RAID_DIRTY_SECONDS))
+    or sinceRefresh >= REFRESH_SECONDS then
     ns.UpdateParty()
   end
 end
@@ -789,8 +1104,9 @@ function ns.PartyDebug()
       Say(string.format("FlareUI_Party%d: unit %s, visible %s", i, tostring(ok and unit), tostring(frame:IsVisible())))
     end
   end
-  local frames = FindFrames()
-  for index, unit in ipairs(UNITS) do
+  local units, raid = GroupUnits()
+  local frames = FindFrames(units, raid)
+  for _, unit in ipairs(units) do
     if UnitExists(unit) then
       local needs = {}
       for _, family in ipairs(FamiliesFor(unit)) do
@@ -799,7 +1115,7 @@ function ns.PartyDebug()
           or remaining == math.huge and "has" or string.format("%ds", remaining))
       end
       local shown = 0
-      for _, button in ipairs(buttons[index] or {}) do
+      for _, button in ipairs(buttons[unit] or {}) do
         if button:IsShown() then
           shown = shown + 1
         end

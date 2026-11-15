@@ -5,7 +5,7 @@ local _, ns = ...
 -- and per party member.
 
 local ROW_HEIGHT = 24
-local HEADING_Y = -180 -- below the page header (ns.T.OPTIONS_TOP) and the two check boxes
+local HEADING_Y = -204 -- below the page header (ns.T.OPTIONS_TOP) and the three check boxes
 local LIST_Y = HEADING_Y - 22
 local LEFT_X, LEFT_WIDTH = 16, 290
 local RIGHT_X, RIGHT_WIDTH = 330, 250
@@ -17,7 +17,8 @@ if select(4, GetBuildInfo()) >= 30000 and select(4, GetBuildInfo()) < 40000 then
 end
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 
-local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton, allBlessingsCheck
+local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton, allBlessingsCheck, reagentButton
+local raidCheck
 local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
@@ -131,6 +132,11 @@ local function RefreshBuffs()
       local first = family.spells[1]
       if ns.KnowsSpell(first.name) and first.reagents then
         row.reagent:SetText((ns.ReagentName(first) or "Reagent") .. ": " .. ns.ReagentCount(first))
+        if ns.ReagentLow(first) then
+          row.reagent:SetTextColor(1, 0.6, 0.2)
+        else
+          row.reagent:SetTextColor(0.5, 0.5, 0.5)
+        end
       else
         row.reagent:SetText("")
       end
@@ -241,11 +247,14 @@ function ns.RefreshPartyOptions()
   enabledCheck:SetChecked(ns.db.party.enabled)
   refreshCheck:SetChecked(ns.db.party.refresh)
   allBlessingsCheck:SetChecked(ns.db.party.allBlessings)
+  raidCheck:SetChecked(ns.db.party.raid)
   refreshButton:SetText(ns.FormatSeconds(ns.db.party.refreshSeconds))
   refreshButton:SetEnabled(ns.db.party.refresh)
   rangeCheck:SetChecked(ns.db.party.range)
   rangeButton:SetText(ns.db.party.rangeYards .. " yd")
   rangeButton:SetEnabled(ns.db.party.range)
+  local warn = ns.db.party.reagentWarn
+  reagentButton:SetText(warn > 0 and tostring(warn) or "Off")
   RefreshBuffs()
   RefreshBlessings()
 end
@@ -290,7 +299,25 @@ function ns.CreatePartyOptions()
     ns.PartyChanged()
   end)
 
-  -- Right column, beside the two boxes above: a distance limit, cycling through ns.RANGE_CHOICES.
+  raidCheck = CheckBox(panel, "Buttons on raid frames")
+  raidCheck:SetPoint("TOPLEFT", refreshCheck, "BOTTOMLEFT", 0, 2)
+  raidCheck:SetHitRectInsets(0, -(raidCheck.Text:GetStringWidth() + 4), 0, 0)
+  raidCheck:SetScript("OnClick", function(self)
+    ns.db.party.raid = self:GetChecked() and true or false
+    ns.PartyChanged()
+  end)
+  raidCheck:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Buttons on raid frames")
+    GameTooltip:AddLine("In a raid, small buttons in the top right corner of each raid frame. They hide during "
+      .. "combat, so a click there always reaches the raid frame.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  raidCheck:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+
+  -- Right column, beside the boxes above: a distance limit, cycling through ns.RANGE_CHOICES.
   rangeCheck = CheckBox(panel, "Hide when farther than")
   rangeCheck:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X - 2, ns.T.OPTIONS_TOP)
   rangeCheck:SetHitRectInsets(0, -(rangeCheck.Text:GetStringWidth() + 4), 0, 0)
@@ -350,6 +377,33 @@ function ns.CreatePartyOptions()
   allBlessingsHelp:SetJustifyH("LEFT")
   allBlessingsHelp:SetText("When a member has no blessing, or another paladin already gave them the one chosen on "
     .. "the right, show a button for each blessing they don't have yet, not only the chosen one.")
+
+  -- Low reagent warning, cycling through ns.REAGENT_CHOICES (0 = off).
+  local reagentLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  reagentLabel:SetPoint("TOPLEFT", allBlessingsHelp, "BOTTOMLEFT", -22, -14)
+  reagentLabel:SetText("Warn when reagents drop to")
+
+  reagentButton = ns.T.Button(panel, 48, 20)
+  reagentButton:SetPoint("LEFT", reagentLabel, "RIGHT", 8, 0)
+  reagentButton:SetScript("OnClick", function()
+    local party = ns.db.party
+    local nextValue = ns.REAGENT_CHOICES[1]
+    for _, count in ipairs(ns.REAGENT_CHOICES) do
+      if count > party.reagentWarn then
+        nextValue = count
+        break
+      end
+    end
+    party.reagentWarn = nextValue
+    ns.PartyChanged()
+  end)
+
+  local reagentHelp = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  reagentHelp:SetPoint("TOPLEFT", reagentLabel, "BOTTOMLEFT", 0, -4)
+  reagentHelp:SetWidth(LEFT_WIDTH - 4)
+  reagentHelp:SetJustifyH("LEFT")
+  reagentHelp:SetText("A chat message each time a reagent of your group buffs goes down to this many or fewer. "
+    .. "The button tooltips show the count in orange.")
 
   blessingTitle = ns.T.Heading(panel, "Blessings by class", RIGHT_WIDTH)
   blessingTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", RIGHT_X, HEADING_Y)
