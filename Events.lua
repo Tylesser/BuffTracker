@@ -11,6 +11,7 @@ eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player") -- weapon enchants, where nothing else fires
 pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED") -- Retail only
+pcall(eventFrame.RegisterEvent, eventFrame, "MINIMAP_UPDATE_TRACKING") -- Find Minerals etc. switched
 
 local function Setup()
   BuffTrackerDB = BuffTrackerDB or {}
@@ -140,6 +141,7 @@ SlashCmdList.BUFFTRACKER = function(msg)
     ns.OpenDispelOptions()
   elseif command == "debug" then
     ns.PartyDebug()
+    print(ns.PREFIX .. "tracking: " .. ns.TrackingDebug())
   elseif command == "feedback" then
     ns.T.ShowFeedback()
   elseif command == "list" then

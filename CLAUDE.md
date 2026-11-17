@@ -67,11 +67,12 @@ Shared conventions, release steps and the game client are in the workspace file 
   first, `types` + `typeList`), `ns.DISPEL_FILTER` (`HARMFUL`, or `HARMFUL|RAID` on MoP+ where talents decide and the game
   filters), `ns.DispelSpells()` (known dispels that add a type not covered by an earlier one; cached per `ns.known`
   table), `ns.RemovableDebuffs(debuffs)` (`{ [spell] = { debuff... } }`, keyed by the `ns.DISPELS` entries), the
-  shared tooltip, `BuffTrackerDB.dispel` (`party`, `self`, both default on) and the player's own row: secure buttons
+  shared tooltip, `BuffTrackerDB.dispel` (`party`, `self`, `combat`, all default on) and the player's own row: secure buttons
   (`ns.NewSecureButton` from Party.lua, unit player) on UIParent at coordinates under the row anchor (`ns.RowAnchor`,
-  hidden while `ns.IsRowUnlocked`), laid out from `ns.UpdateDisplay`. Debuffs are read with `ns.ReadDebuffs(unit,
+  hidden while `ns.IsRowUnlocked`), laid out from `ns.UpdateDisplay`; in combat plain `selfIcons` (`ns.NewDispelIcon`)
+  at the same spots for debuffs no shown button covers. Debuffs are read with `ns.ReadDebuffs(unit,
   filter)` in Core.lua (typed debuffs only, same secret checks as `ReadBuffs`). In Party.lua dispel slots come after the
-  buff buttons in a member's row (so buff buttons never move when dispel slots come and go) (`need.dispel`, `button.dispel`), party only (not raids), and `DispelLooks` sets icon (the
+  buff buttons in a member's row (so buff buttons never move when dispel slots come and go) (`need.dispel`, `button.dispel`), party and raid (raid buttons on the holder), and `DispelLooks` sets icon (the
   debuff's), border (type color), alpha.
 - `Options.lua`: canvas page in Blizzard's settings: tracked buffs on the left (two-line rows: name, "when" and X; then
   the "Use item" cycle button, right-click clears, and the Alert box), buffs, spells and the two weapon enchant entries
@@ -104,9 +105,15 @@ Shared conventions, release steps and the game client are in the workspace file 
 - Alerts depend on reading buffs in combat. While `ReadBuffs` can't (secret values) a drop isn't seen, so no alert.
 - Party buttons are secure: never call Show, Hide, SetPoint or SetAttribute on them in combat
   (`InCombatLockdown()`). `ns.UpdateParty` only recolors in combat and lays out again on `PLAYER_REGEN_ENABLED`.
-- Dispels matter in combat, when buttons can't appear. On `PLAYER_REGEN_DISABLED` (still before the lockdown)
-  `ns.UpdateParty(true)` and `ns.UpdateSelfDispel(true)` give every member, and you, a slot per known dispel; in combat
-  only alpha (0 = nothing to remove), icon and border change. An empty slot still takes a click (documented). In a
-  party with dispel buttons `ns.PartyTick` also updates right after events in combat, so a debuff shows within a
-  tick; otherwise (and in raids) the once-a-second refresh in combat stays. Empty slots show no tooltip.
+- Dispels matter in combat, when buttons can't appear. A needed dispel without a shown button then gets a plain
+  **combat icon**: `ns.NewDispelIcon()` (Party.lua: a `Frame` on UIParent with the button look from the shared `Dress`,
+  `EnableMouse(false)` so clicks fall through, a small `count` text, `combatDispel = true`; `unit`/`spell` set when
+  used). Party.lua "Combat icons" (`combatIcons[unit][slot]`, `UpdateCombatIcons` from `ns.UpdateParty` in combat)
+  places them with the same `Place` as the buttons: after the member's last shown button in a party, at the raid
+  frame's corner in a raid (the holder hides raid buttons in combat). A dispel button made before combat still works
+  and shows its debuff itself (`DispelLooks`: alpha 0 = nothing to remove), so it gets no icon (`HasDispelButton`).
+  Icons are made lazily, hide when the debuff goes, out of combat (`HideCombatIcons`) and when `dispel.combat`
+  ("Show dispel icons in combat", default on) is off. Nothing is pre-made at `PLAYER_REGEN_DISABLED` any more. With
+  dispels on, `ns.PartyTick` updates right after events in combat (raids at most every 0.5 s), so a debuff shows
+  within a tick; without, the once-a-second refresh stays.
 - Avoid UI templates that differ per client (sliders, dropdowns). The icon size uses plain buttons for this reason.

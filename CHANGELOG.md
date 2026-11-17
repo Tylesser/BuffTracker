@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0
+
+- **Dispel icons in combat:** the game doesn't let addons add clickable buttons during a fight, so a debuff you can remove that shows up in combat now gets a plain icon in the button's place instead, next to the party frame, in the corner of the raid frame, or under your icon row. It takes no clicks, so a click there reaches the frame under it. The empty spots that used to be made as combat started are gone. Dispel buttons now work in raids too (out of combat, like the buff buttons). New setting **Show dispel icons in combat** on the Dispels page, on by default.
+- **Tracking buffs:** Find Minerals, Find Herbs and the other tracking abilities now count as active when they're on, and clicking their icon turns them on. Before, they always showed as missing and the click did nothing.
+
 ## 1.5.0
 
 - **Dispel buttons:** when a party member has a debuff you can remove, like a poison or a curse, a button with its icon appears next to their party frame. Click it to cast your dispel on them. The same buttons for your own debuffs sit under your icon row.

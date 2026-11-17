@@ -250,6 +250,60 @@ end
 
 -- Buffs are matched by name, so every rank of a spell counts. A buff that can't be read keeps
 -- its last known state rather than showing up as missing.
+-- Minimap tracking (Find Minerals, Find Herbs, Track Beasts, ...): on Forever these are not auras, so the
+-- active ones are read from the tracking list and count as buffs that are up (no timer).
+local function TrackingInfo(index)
+  local a, b, c, d, e, f = C_Minimap.GetTrackingInfo(index)
+  if type(a) == "table" then
+    return a.name, a.texture, a.active
+  end
+  return a, b, c -- older form: name, texture, active, ...
+end
+
+function ns.ReadTracking()
+  local list = {}
+  local ok, count = false, 0
+  if C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo then
+    ok, count = pcall(C_Minimap.GetNumTrackingTypes)
+  end
+  for index = 1, (ok and type(count) == "number") and count or 0 do
+    local okInfo, name, texture, active = pcall(TrackingInfo, index)
+    if okInfo and active and type(name) == "string" and name ~= "" then
+      list[#list + 1] = { name = name, icon = texture, count = 0, expires = 0, mine = true }
+    end
+  end
+  -- the older single-tracking call: the icon of the one tracking that is on (matched by icon below)
+  if type(GetTrackingTexture) == "function" then
+    local ok, texture = pcall(GetTrackingTexture)
+    if ok and texture ~= nil and (not canaccessvalue or canaccessvalue(texture)) then
+      list[#list + 1] = { icon = texture, count = 0, expires = 0, mine = true }
+    end
+  end
+  return list
+end
+
+-- One chat-ready line about what the game reports as tracking (for /btrack debug and /codex buffs debug).
+function ns.TrackingDebug()
+  local parts = {}
+  if C_Minimap and C_Minimap.GetNumTrackingTypes then
+    local ok, count = pcall(C_Minimap.GetNumTrackingTypes)
+    parts[#parts + 1] = "types=" .. tostring(count)
+    for index = 1, (ok and type(count) == "number") and math.min(count, 12) or 0 do
+      local okInfo, name, texture, active = pcall(TrackingInfo, index)
+      if okInfo and name then
+        parts[#parts + 1] = ("%s%s(%s)"):format(active and "*" or "", tostring(name), tostring(texture))
+      end
+    end
+  else
+    parts[#parts + 1] = "no C_Minimap tracking"
+  end
+  if type(GetTrackingTexture) == "function" then
+    local ok, texture = pcall(GetTrackingTexture)
+    parts[#parts + 1] = "GetTrackingTexture=" .. tostring(ok and texture)
+  end
+  return table.concat(parts, " ")
+end
+
 function ns.Scan()
   local buffs, complete = ns.ReadBuffs("player")
   ns.buffs = buffs
@@ -262,15 +316,28 @@ function ns.Scan()
       found[key] = buff
     end
   end
+  local trackingIcons = {}
+  for _, tracking in ipairs(ns.ReadTracking()) do
+    if tracking.name then
+      local key = tracking.name:lower()
+      if not found[key] then
+        found[key] = tracking
+      end
+    end
+    if tracking.icon then
+      trackingIcons[tracking.icon] = tracking
+    end
+  end
 
   for _, entry in ipairs(ns.db.tracked) do
     if not entry.slot then
       local state = StateFor(entry)
-      local buff = found[entry.name:lower()]
+      -- by name, else an active tracking with the entry's icon (Forever may name tracking differently)
+      local buff = found[entry.name:lower()] or (entry.icon and trackingIcons[entry.icon])
       if buff then
         SetState(entry, state, true, buff.count, buff.expires)
         -- Learn the exact name and icon, for buffs that were typed in by hand.
-        entry.name = buff.name
+        entry.name = buff.name or entry.name -- a tracking matched by icon has no name
         entry.icon = buff.icon or entry.icon
       elseif complete then
         SetState(entry, state, false, 0, 0)

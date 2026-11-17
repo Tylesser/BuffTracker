@@ -303,7 +303,6 @@ combatFrame:SetScript("OnEvent", function(_, event)
     -- still allowed while this event runs: the lockdown starts right after it
     if not InCombatLockdown() then
       HideClicks()
-      ns.UpdateSelfDispel(true) -- your dispel buttons, invisible until needed (Dispel.lua)
     end
   elseif ns.db then
     ns.UpdateDisplay()

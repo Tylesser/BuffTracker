@@ -7,9 +7,9 @@ local _, ns = ...
 -- member only dims its button. Raid buttons sit on a secure holder that the game itself hides in
 -- combat (a state driver), so they never catch a click meant for healing. Buttons are made only
 -- when first needed (out of combat), as each one costs memory.
--- In a party, dispel buttons follow the buff buttons in a member's row (see Dispel.lua): as combat
--- starts each member gets one for every dispel you know, invisible until a debuff it removes shows
--- up. After the buffs, so the buff buttons never move under the mouse when those come and go.
+-- Dispel buttons follow the buff buttons in a member's row (see Dispel.lua), so the buff buttons
+-- never move under the mouse when those come and go. In combat, when no button can appear, a
+-- debuff gets a plain icon in the same place instead ("Combat icons" below).
 
 local SIZE = 24
 local RAID_MIN_SIZE, RAID_MAX_SIZE = 12, 14 -- buttons in a raid frame's corner
@@ -166,7 +166,51 @@ end
 -- Spells the character knows, by lower-case name.
 ns.known = {}
 
+-- A spell not in the spell book list (profession abilities like Find Minerals sit elsewhere on Forever):
+-- asked by its ID, once per name per refresh.
+local askedKnown = {}
+local function KnownByID(name)
+  local key = name:lower()
+  if askedKnown[key] ~= nil then
+    return askedKnown[key]
+  end
+  local id
+  if C_Spell and C_Spell.GetSpellInfo then
+    local ok, info = pcall(C_Spell.GetSpellInfo, name)
+    id = ok and type(info) == "table" and info.spellID or nil
+  end
+  if not id and GetSpellInfo then
+    local ok, _, _, _, _, _, _, spellID = pcall(GetSpellInfo, name)
+    id = ok and spellID or nil
+  end
+  local known = false
+  if type(id) == "number" then
+    -- (a list with a hole in it would stop ipairs early: each is looked at by position)
+    local checks = { C_SpellBook and C_SpellBook.IsSpellKnown or false, IsPlayerSpell or false, IsSpellKnown or false }
+    for index = 1, #checks do
+      local check = checks[index]
+      if type(check) == "function" then
+        local ok, result = pcall(check, id)
+        if ok and result then
+          known = true
+          break
+        end
+      end
+    end
+  end
+  askedKnown[key] = known
+  return known
+end
+
+function ns.KnowsSpell(name)
+  if ns.known[name:lower()] then
+    return true
+  end
+  return KnownByID(name)
+end
+
 function ns.RefreshKnown()
+  askedKnown = {}
   local known = {}
   for _, spell in ipairs(ns.GetSpellbook()) do
     known[spell.name:lower()] = true
@@ -174,9 +218,7 @@ function ns.RefreshKnown()
   ns.known = known
 end
 
-function ns.KnowsSpell(name)
-  return ns.known[name:lower()] or false
-end
+
 
 function ns.KnowsFamily(family)
   for _, spell in ipairs(family.spells) do
@@ -351,9 +393,9 @@ local fromMe = {}
 -- Debuffs you can remove, per unit: { [dispel spell] = { debuff, ... } } (ns.RemovableDebuffs).
 local removable = {}
 
--- Dispel buttons: in a party (not a raid), when on and you know a dispel.
+-- Dispel buttons and combat icons: when on and you know a dispel (party and raid).
 local function DispelsOn()
-  return ns.db.dispel.party and not (IsInRaid and IsInRaid()) and #ns.DispelSpells() > 0
+  return ns.db.dispel.party and #ns.DispelSpells() > 0
 end
 
 local function ScanUnit(unit)
@@ -739,6 +781,19 @@ local function RaidHolder()
   return raidHolder
 end
 
+-- The Tylesser look of a button or icon: black backdrop, double border, the art inset.
+local function Dress(frame)
+  local backdrop = frame:CreateTexture(nil, "BACKGROUND")
+  backdrop:SetAllPoints()
+  backdrop:SetColorTexture(0, 0, 0, 1)
+  frame.border = ns.T.DoubleBorder(frame)
+  frame.icon = frame:CreateTexture(nil, "ARTWORK")
+  frame.icon:SetPoint("TOPLEFT", 3, -3)
+  frame.icon:SetPoint("BOTTOMRIGHT", -3, 3)
+  frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  frame.roundParts = { frame.icon, backdrop }
+end
+
 -- A secure button with the Tylesser look (also used for your own dispel buttons in Dispel.lua).
 -- Hidden; out of combat only.
 function ns.NewSecureButton(parent)
@@ -752,19 +807,25 @@ function ns.NewSecureButton(parent)
     button:RegisterForClicks("AnyUp")
   end
   button:SetAttribute("type", "spell")
-
-  local backdrop = button:CreateTexture(nil, "BACKGROUND")
-  backdrop:SetAllPoints()
-  backdrop:SetColorTexture(0, 0, 0, 1)
-  button.border = ns.T.DoubleBorder(button)
-  button.icon = button:CreateTexture(nil, "ARTWORK")
-  button.icon:SetPoint("TOPLEFT", 3, -3)
-  button.icon:SetPoint("BOTTOMRIGHT", -3, 3)
-  button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  Dress(button)
   button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-  button.roundParts = { button.icon, backdrop }
   button:Hide()
   return button
+end
+
+-- A plain icon with the same look, for combat (see "Combat icons" below; also your own row in
+-- Dispel.lua). Not a button: the mouse goes through it to whatever is under it. Hidden. Plain
+-- frames may be made, shown, hidden and moved in combat.
+function ns.NewDispelIcon()
+  local icon = CreateFrame("Frame", nil, UIParent)
+  icon:SetSize(SIZE, SIZE)
+  icon:EnableMouse(false)
+  Dress(icon)
+  icon.count = icon:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+  icon.count:SetPoint("BOTTOMRIGHT", -2, 2)
+  icon.combatDispel = true
+  icon:Hide()
+  return icon
 end
 
 local function CreateButton(parent)
@@ -920,34 +981,159 @@ local function SideOf(frame, raid)
   return frameX < screenX and "right" or "left"
 end
 
-local function PlaceButton(row, slot, frame, side, size)
-  local button = row[slot]
-  button:SetSize(size, size)
-  button:ClearAllPoints()
+-- Puts region (a button or a combat icon) at the frame, or after the previous one in the row.
+local function Place(region, previous, frame, side, size)
+  region:SetSize(size, size)
+  region:ClearAllPoints()
   if side == "corner" then
-    if slot == 1 then
-      button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+    if previous then
+      region:SetPoint("RIGHT", previous, "LEFT", -1, 0)
     else
-      button:SetPoint("RIGHT", row[slot - 1], "LEFT", -1, 0)
-    end
-  elseif slot == 1 then
-    if side == "right" then
-      button:SetPoint("LEFT", frame, "RIGHT", GAP, 0)
-    else
-      button:SetPoint("RIGHT", frame, "LEFT", -GAP, 0)
+      region:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
     end
   elseif side == "right" then
-    button:SetPoint("LEFT", row[slot - 1], "RIGHT", GAP, 0)
+    region:SetPoint("LEFT", previous or frame, "RIGHT", GAP, 0)
   else
-    button:SetPoint("RIGHT", row[slot - 1], "LEFT", -GAP, 0)
+    region:SetPoint("RIGHT", previous or frame, "LEFT", -GAP, 0)
   end
-  button:SetFrameStrata(frame:GetFrameStrata())
-  button:SetFrameLevel(frame:GetFrameLevel() + 10)
+  region:SetFrameStrata(frame:GetFrameStrata())
+  region:SetFrameLevel(frame:GetFrameLevel() + 10)
 end
 
--- combatStart: called as combat starts (PLAYER_REGEN_DISABLED, still out of the lockdown), so
--- every party member gets a button for each dispel you know.
-function ns.UpdateParty(combatStart)
+local function PlaceButton(row, slot, frame, side, size)
+  Place(row[slot], slot > 1 and row[slot - 1] or nil, frame, side, size)
+end
+
+-- Combat icons ---------------------------------------------------------------------------------
+-- In combat the game doesn't let addons add, show or move clickable buttons, yet that is when
+-- dispels matter. So a debuff that shows up in combat gets a plain icon (ns.NewDispelIcon) in the
+-- place its button would take: after the member's row in a party, in the raid frame's corner in a
+-- raid (the holder hides the raid buttons in combat). A dispel button made before combat still
+-- works and shows its debuff itself (DispelLooks), so it gets no icon. The icons hide when the
+-- debuff goes and when combat ends, and are made only when first needed. Option dispel.combat.
+
+local combatIcons = {} -- combatIcons[unit][slot]
+
+local function GetCombatIcon(unit, slot)
+  local row = combatIcons[unit]
+  if not row then
+    row = {}
+    combatIcons[unit] = row
+  end
+  for index = #row + 1, slot do
+    row[index] = ns.NewDispelIcon()
+  end
+  return row[slot]
+end
+
+-- The last shown button of the unit's row at this frame, which the icons follow. nil in a raid,
+-- where the buttons are hidden with their holder.
+local function RowEnd(unit, frame, raid)
+  if raid then
+    return nil
+  end
+  local last
+  for _, button in ipairs(buttons[unit] or {}) do
+    if button:IsShown() and button.frame == frame then
+      last = button
+    end
+  end
+  return last
+end
+
+-- Whether a dispel button made before combat shows this spell for the unit already.
+local function HasDispelButton(unit, spell, frame, raid)
+  if raid then
+    return false
+  end
+  for _, button in ipairs(buttons[unit] or {}) do
+    if button:IsShown() and button.dispel == spell and button.frame == frame and not FrameMoved(button) then
+      return true
+    end
+  end
+  return false
+end
+
+local function CombatIconLooks(icon, unit, spell, list)
+  local debuff = list[1]
+  icon.icon:SetTexture(debuff.icon or SpellIcon(spell.name) or ns.DEFAULT_ICON)
+  ns.SetFrameColor(icon, ns.DebuffColor(debuff.type))
+  local _, noMana = IsUsable(spell.name)
+  if not InRange(spell.name, unit) then
+    icon.icon:SetVertexColor(1, 0.3, 0.3)
+  elseif noMana then
+    icon.icon:SetVertexColor(0.4, 0.4, 1)
+  else
+    icon.icon:SetVertexColor(1, 1, 1)
+  end
+  icon.count:SetText(#list > 1 and tostring(#list) or "")
+end
+
+-- Hides every combat icon, or with used (unit -> count) those past the ones in use.
+local function HideCombatIcons(used)
+  for unit, row in pairs(combatIcons) do
+    for slot = (used and used[unit] or 0) + 1, #row do
+      if row[slot]:IsShown() then
+        row[slot]:Hide()
+      end
+    end
+  end
+end
+
+-- In combat: an icon for each dispel a member needs now. Points are set only when something
+-- changed, as with the buttons.
+local function UpdateCombatIcons(units, raid)
+  if not (InCombatLockdown() and ns.db.dispel.combat and DispelsOn()) then
+    HideCombatIcons()
+    return
+  end
+  local frames = FindFrames(units, raid)
+  local spells = ns.DispelSpells()
+  local used = {}
+  for _, unit in ipairs(units) do
+    local frame, list = frames[unit], removable[unit]
+    if frame and list and next(list) and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit) then
+      local size, limit = SIZE, MAX_PER_UNIT
+      if raid then
+        size, limit = InsideFit(frame)
+      end
+      local side = SideOf(frame, raid)
+      local previous = RowEnd(unit, frame, raid)
+      local count = 0
+      for _, spell in ipairs(spells) do
+        if list[spell] and count < limit and not HasDispelButton(unit, spell, frame, raid) then
+          count = count + 1
+          local icon = GetCombatIcon(unit, count)
+          icon.unit, icon.spell = unit, spell
+          if not (icon:IsShown() and icon.frame == frame and icon.previous == previous and icon.size == size
+            and icon.side == side) then
+            icon.frame, icon.previous, icon.size, icon.side = frame, previous, size, side
+            Place(icon, previous, frame, side, size)
+            icon:Show()
+          end
+          ns.ApplyShape(icon, ns.IsRound())
+          CombatIconLooks(icon, unit, spell, list[spell])
+          previous = icon
+        end
+      end
+      used[unit] = count
+    end
+  end
+  HideCombatIcons(used)
+end
+
+-- Shown combat icons of a unit (for /btrack debug).
+local function CombatIconCount(unit)
+  local count = 0
+  for _, icon in ipairs(combatIcons[unit] or {}) do
+    if icon:IsShown() then
+      count = count + 1
+    end
+  end
+  return count
+end
+
+function ns.UpdateParty()
   if not (ns.db and ready) then
     return
   end
@@ -981,8 +1167,10 @@ function ns.UpdateParty(combatStart)
   if InCombatLockdown() then
     -- PLAYER_REGEN_ENABLED lays out again when combat ends
     UpdateLooks()
+    UpdateCombatIcons(units, raid)
     return
   end
+  HideCombatIcons()
 
   local party = ns.db.party
   local wantBuffs = party.enabled and (party.raid or not raid)
@@ -1010,11 +1198,10 @@ function ns.UpdateParty(combatStart)
         end
       end
     end
-    if frame and wantDispels then
-      -- out of combat only the dispels needed now; as combat starts, all of them
+    if frame and wantDispels and reachable then
       local list = removable[unit] or {}
       for _, spell in ipairs(ns.DispelSpells()) do
-        if combatStart or (reachable and list[spell]) then
+        if list[spell] then
           needs[#needs + 1] = { dispel = spell, spell = spell }
         end
       end
@@ -1109,13 +1296,6 @@ eventFrame:SetScript("OnEvent", function(_, event, unit)
   if not ns.db then
     return
   end
-  if event == "PLAYER_REGEN_DISABLED" then
-    -- still allowed while this event runs: the lockdown starts right after it
-    if not InCombatLockdown() and DispelsOn() then
-      ns.UpdateParty(true)
-    end
-    return
-  end
   if event == "UNIT_AURA" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
     if not IsGroupUnit(unit) then
       return
@@ -1150,17 +1330,15 @@ eventFrame:SetScript("OnEvent", function(_, event, unit)
 end)
 
 -- Called from the main tick: refreshes after events, and every second for timers, range and
--- frames that moved. In combat only once a second, except in a party with dispel buttons: there
--- right after events, so a debuff shows on its dispel button at once.
+-- frames that moved. In combat only once a second, except with dispels: then right after events
+-- (in a raid at most every half second), so a debuff gets its icon at once.
 function ns.PartyTick(elapsed)
   sinceRefresh = sinceRefresh + elapsed
   sinceFullScan = sinceFullScan + elapsed
   local raid = IsInRaid and IsInRaid()
-  local soon
+  local soon = not InCombatLockdown() or DispelsOn()
   if raid then
-    soon = not InCombatLockdown() and sinceRefresh >= RAID_DIRTY_SECONDS
-  else
-    soon = not InCombatLockdown() or DispelsOn()
+    soon = soon and sinceRefresh >= RAID_DIRTY_SECONDS
   end
   if (dirty and soon) or sinceRefresh >= REFRESH_SECONDS then
     ns.UpdateParty()
@@ -1239,10 +1417,11 @@ function ns.PartyDebug()
       end
       table.sort(debuffs)
       Say(string.format("%s %s: frame %s, buffs read %s, %s, blessing from you %s, to remove %s, buttons %d, "
-        .. "distance %s%s", unit, GetUnitName(unit, false) or "?", FrameName(frames[unit]),
+        .. "combat icons %d, distance %s%s", unit, GetUnitName(unit, false) or "?", FrameName(frames[unit]),
         auras[unit] and "yes" or "no", #needs > 0 and table.concat(needs, " ") or "nothing to give",
         HasMyBlessing(unit) and "yes" or "no", #debuffs > 0 and table.concat(debuffs, ", ") or "nothing", shown,
-        distance and string.format("%d yd", distance) or "unknown", TooFar(unit) and " (too far)" or ""))
+        CombatIconCount(unit), distance and string.format("%d yd", distance) or "unknown",
+        TooFar(unit) and " (too far)" or ""))
     end
   end
 end

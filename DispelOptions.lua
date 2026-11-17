@@ -6,7 +6,7 @@ local _, ns = ...
 local LEFT_X, WIDTH = 16, 560
 local ROW_HEIGHT = 26
 
-local panel, partyCheck, selfCheck, listTitle, listEmpty
+local panel, partyCheck, selfCheck, combatCheck, listTitle, listEmpty
 local rows = {}
 
 local function SpellIcon(name)
@@ -40,6 +40,7 @@ function ns.RefreshDispelOptions()
   end
   partyCheck:SetChecked(ns.db.dispel.party)
   selfCheck:SetChecked(ns.db.dispel.self)
+  combatCheck:SetChecked(ns.db.dispel.combat)
   local spells = ns.DispelSpells()
   for index, spell in ipairs(spells) do
     local row = GetRow(index)
@@ -86,8 +87,7 @@ function ns.CreateDispelOptions()
     ns.db.dispel.party = self:GetChecked() and true or false
     Changed()
   end)
-  local partyHelp = Help(partyCheck, "In a party, after the buff buttons. Not in raids: there the game would "
-    .. "only let them show out of combat.")
+  local partyHelp = Help(partyCheck, "In a party after the buff buttons, in a raid in the corner of the raid frames.")
 
   selfCheck = ns.T.Check(panel, "Dispel buttons for yourself, under the icon row")
   selfCheck:SetPoint("TOPLEFT", partyHelp, "BOTTOMLEFT", -26, -8)
@@ -97,16 +97,18 @@ function ns.CreateDispelOptions()
   end)
   local selfHelp = Help(selfCheck, "Also when you play alone.")
 
-  local combat = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  combat:SetPoint("TOPLEFT", selfHelp, "BOTTOMLEFT", -24, -14)
-  combat:SetWidth(WIDTH)
-  combat:SetJustifyH("LEFT")
-  combat:SetText("In combat the game doesn't let addons add or remove buttons. So as combat starts, each party "
-    .. "member (and you) gets a spot for every dispel you know. It stays empty until a debuff you can remove "
-    .. "shows up, but an empty spot still takes a click.")
+  combatCheck = ns.T.Check(panel, "Show dispel icons in combat")
+  combatCheck:SetPoint("TOPLEFT", selfHelp, "BOTTOMLEFT", -26, -8)
+  combatCheck:SetScript("OnClick", function(self)
+    ns.db.dispel.combat = self:GetChecked() and true or false
+    Changed()
+  end)
+  local combatHelp = Help(combatCheck, "During a fight the game doesn't let addons add or move clickable buttons, so "
+    .. "a debuff that shows up then gets a plain icon in the same place instead. It takes no clicks. Buttons that "
+    .. "were there before the fight keep working.")
 
   listTitle = ns.T.Heading(panel, "Your dispels", WIDTH)
-  listTitle:SetPoint("TOPLEFT", combat, "BOTTOMLEFT", 0, -18)
+  listTitle:SetPoint("TOPLEFT", combatHelp, "BOTTOMLEFT", -24, -18)
 
   listEmpty = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   listEmpty:SetPoint("TOPLEFT", listTitle, "BOTTOMLEFT", 0, -8)
