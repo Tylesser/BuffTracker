@@ -388,7 +388,8 @@ end
 
 -- Buffs read per unit: lower-case name -> expiration time (0 = no timer). nil = not read yet.
 local auras = {}
--- The same buffs that may be yours: cast by you, or the game doesn't say who cast them.
+-- Who cast those buffs, when it may be you: lower-case name -> true (you), or "unknown" (the game
+-- doesn't say). Buffs from someone else are left out.
 local fromMe = {}
 -- Debuffs you can remove, per unit: { [dispel spell] = { debuff, ... } } (ns.RemovableDebuffs).
 local removable = {}
@@ -411,8 +412,10 @@ local function ScanUnit(unit)
   local found, mine = {}, {}
   for _, buff in ipairs(buffs) do
     found[buff.name:lower()] = buff.expires
-    if buff.mine ~= false then
+    if buff.mine == true then
       mine[buff.name:lower()] = true
+    elseif buff.mine == nil and not mine[buff.name:lower()] then
+      mine[buff.name:lower()] = "unknown"
     end
   end
   auras[unit] = complete and found or nil
@@ -435,21 +438,32 @@ local function Remaining(unit, family)
   return best
 end
 
--- Whether the unit has a blessing from you. A blessing whose caster the game doesn't give counts
--- as yours, so "every blessing" never shows by mistake right after you bless someone.
-local function HasMyBlessing(unit)
+-- The blessing family the unit has from you, or nil; with how = "unknown" instead the first one
+-- whose caster the game doesn't give. Blessings from other paladins never count: each paladin
+-- keeps one blessing of their own on a member (Greater Blessing of X counts as X).
+local function MyBlessing(unit, how)
   local mine = fromMe[unit]
   if not mine then
-    return false
+    return nil
   end
+  how = how or true
   for _, family in ipairs(ns.BLESSINGS) do
     for _, spell in ipairs(family.spells) do
-      if mine[spell.name:lower()] then
-        return true
+      if mine[spell.name:lower()] == how then
+        return family
       end
     end
   end
-  return false
+  return nil
+end
+
+local function HasMyBlessing(unit)
+  return MyBlessing(unit) ~= nil
+end
+
+-- Whether a blessing on the unit may be yours: yours, or its caster unknown.
+local function MayHaveMyBlessing(unit)
+  return MyBlessing(unit) ~= nil or MyBlessing(unit, "unknown") ~= nil
 end
 
 local function HasAnyBlessing(unit)
@@ -473,10 +487,17 @@ local function BlessingsFor(unit)
   if not ns.db.party.allBlessings then
     return { chosen }, {}
   end
-  if HasMyBlessing(unit) then
-    -- any blessing from you will do, as you can keep only one on each member; the chosen one
-    -- stays in the list so it can still be refreshed when it ends soon
-    return Remaining(unit, chosen) and { chosen } or {}, {}
+  local myBlessing = MyBlessing(unit)
+  if myBlessing then
+    -- any blessing from you will do, as you can keep only one on each member; yours stays in the
+    -- list so it can still be refreshed when it ends soon (never another paladin's: casting that
+    -- would replace yours)
+    return { myBlessing }, {}
+  end
+  if MyBlessing(unit, "unknown") then
+    -- the game doesn't say who cast a blessing on them: it may be yours, so only the chosen one
+    -- (as with "every blessing" off), never extras that would replace it
+    return { chosen }, {}
   end
   local chosenTaken = Remaining(unit, chosen) ~= nil
   if not chosenTaken and HasAnyBlessing(unit) then
@@ -928,8 +949,11 @@ local function UpdateLooks()
         local unit, spell = button.unit, button.spell
         local has = auras[unit] and Remaining(unit, button.family)
         local done = has and not EndsSoon(has)
-        if button.family.blessing and not has and ns.db.party.allBlessings and HasMyBlessing(unit) then
-          done = true -- you blessed them in combat: the other choices are no longer needed
+        if button.family.blessing and not has and ns.db.party.allBlessings
+          and (HasMyBlessing(unit) or (button.everyBlessing and MayHaveMyBlessing(unit))) then
+          -- you blessed them in combat: the other choices are no longer needed (a blessing of unknown
+          -- caster counts only in a row of every blessing, laid out while they had none)
+          done = true
         end
         local _, noMana = IsUsable(spell.name)
         local reachable = UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and InRange(spell.name, unit)
@@ -1193,7 +1217,8 @@ function ns.UpdateParty()
         if remaining == nil or (EndsSoon(remaining) and not extra[family]) then
           local spell, fellBack = ns.ChooseSpell(family)
           if spell and #needs < limit then
-            needs[#needs + 1] = { family = family, spell = spell, fellBack = fellBack, extra = extra[family] }
+            needs[#needs + 1] = { family = family, spell = spell, fellBack = fellBack, extra = extra[family],
+              everyBlessing = next(extra) ~= nil }
           end
         end
       end
@@ -1220,6 +1245,7 @@ function ns.UpdateParty()
       local need = needs[slot]
       if need then
         button.family, button.fellBack, button.extra = need.family, need.fellBack, need.extra
+        button.everyBlessing = need.everyBlessing
         button.dispel = need.dispel
         ns.ApplyShape(button, ns.IsRound())
         if not (button:IsShown() and button.unit == unit and button.spell == need.spell and button.frame == place.frame
@@ -1419,7 +1445,7 @@ function ns.PartyDebug()
       Say(string.format("%s %s: frame %s, buffs read %s, %s, blessing from you %s, to remove %s, buttons %d, "
         .. "combat icons %d, distance %s%s", unit, GetUnitName(unit, false) or "?", FrameName(frames[unit]),
         auras[unit] and "yes" or "no", #needs > 0 and table.concat(needs, " ") or "nothing to give",
-        HasMyBlessing(unit) and "yes" or "no", #debuffs > 0 and table.concat(debuffs, ", ") or "nothing", shown,
+        HasMyBlessing(unit) and "yes" or MayHaveMyBlessing(unit) and "unknown" or "no", #debuffs > 0 and table.concat(debuffs, ", ") or "nothing", shown,
         CombatIconCount(unit), distance and string.format("%d yd", distance) or "unknown",
         TooFar(unit) and " (too far)" or ""))
     end

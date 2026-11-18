@@ -81,13 +81,16 @@ function ns.ReadBuffs(unit)
       if IsSecret(aura) or (canaccesstable and not canaccesstable(aura)) or IsSecret(aura.name) then
         complete = false
       else
-        -- mine: true when you cast it, false when someone else did, nil when the game doesn't say
+        -- mine: true when you cast it, false when someone else did, nil when the game doesn't say.
+        -- isFromPlayerOrPlayerPet is true for a buff from any player (false: from an NPC), so it
+        -- can only prove a buff isn't yours: another paladin's blessing must never count as yours.
         local source, fromPlayer = Plain(aura.sourceUnit), Plain(aura.isFromPlayerOrPlayerPet)
         local mine
         if type(source) == "string" then
-          mine = source == "player"
-        elseif type(fromPlayer) == "boolean" then
-          mine = fromPlayer
+          local ok, same = pcall(UnitIsUnit, source, "player")
+          mine = source == "player" or (ok and same == true)
+        elseif fromPlayer == false then
+          mine = false
         end
         buffs[#buffs + 1] = {
           name = aura.name,

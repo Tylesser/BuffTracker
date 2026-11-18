@@ -57,8 +57,12 @@ Shared conventions, release steps and the game client are in the workspace file 
   with a growing wait (3 to 60 sec, reset as described above). ElvUI raid frames are checked by name in a raid. `PlayerFrame` is never used and the search skips the player. Saved in `BuffTrackerDB.party`:
   `enabled`, `refresh` (default on) + `refreshSeconds` (`ns.REFRESH_CHOICES`, default 60; 1.0.0's `soon` is dropped),
   `allBlessings` (default on: `BlessingsFor` adds every known missing blessing as `extra` when the member has no
-  blessing, or the chosen one is from another paladin; any blessing from you then counts as done. Who cast a buff comes
-  from `sourceUnit` / `isFromPlayerOrPlayerPet` / `UnitAura`'s caster as `buff.mine`; unknown counts as yours),
+  blessing, or the chosen one is from another paladin; a blessing from you then counts as done and only that one is
+  offered for refresh. Who cast a buff: `buff.mine` = true only when `sourceUnit` / `UnitAura`'s caster is you,
+  false when it is someone else or `isFromPlayerOrPlayerPet == false` (an NPC), nil otherwise.
+  `isFromPlayerOrPlayerPet == true` means *any* player, so it never proves "mine". `fromMe[unit][name]` is true or
+  "unknown"; a blessing of unknown caster gives the old rule: the chosen blessing only, no extras, and dims extras in
+  combat only in rows laid out with extras (`button.everyBlessing`)),
   `range` (default on) + `rangeYards` (`ns.RANGE_CHOICES`, default 60: `TooFar` uses `UnitPosition` when it gives a
   position on the same map, else only `UnitIsVisible` (~100 yd) and `UnitInRange` (~40 yd); out of combat far members get
   no buttons, in combat their buttons go to alpha 0), `off[family]`, `classes[CLASS]` and `members[name]` (blessing key or "none"; members win),

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1
+
+- **Blessings:** a party member with another paladin's blessing now gets your blessing button again. Before, another paladin's blessing could be taken for yours, and then no blessing button showed at all.
+
 ## 1.6.0
 
 - **Dispel icons in combat:** the game doesn't let addons add clickable buttons during a fight, so a debuff you can remove that shows up in combat now gets a plain icon in the button's place instead, next to the party frame, in the corner of the raid frame, or under your icon row. It takes no clicks, so a click there reaches the frame under it. The empty spots that used to be made as combat started are gone. Dispel buttons now work in raids too (out of combat, like the buff buttons). New setting **Show dispel icons in combat** on the Dispels page, on by default.
