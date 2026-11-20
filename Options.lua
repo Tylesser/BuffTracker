@@ -9,7 +9,7 @@ local LEFT_WIDTH = 270
 local RIGHT_X = 330
 local RIGHT_WIDTH = 240
 
-local panel, lockCheck, clickCheck, shapeButton, sizeText, searchBox, searchHint, status, presetButton
+local panel, lockCheck, clickCheck, shapeButton, sizeText, searchBox, searchHint, status, presetButton, rowWhere
 local trackedList, pickerList
 local spellbook = {}
 
@@ -127,7 +127,7 @@ local function GetTrackedRow(index)
   row.name:SetWordWrap(false)
 
   -- second line: the item a click uses, and the combat alert
-  row.item = ns.T.Button(row, 170, 20)
+  row.item = ns.T.Button(row, 132, 20)
   row.item:SetPoint("TOPLEFT", 28, -26)
   row.item:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row.item:SetScript("OnClick", function(self, button)
@@ -149,6 +149,17 @@ local function GetTrackedRow(index)
   end)
   row.alert:SetScript("OnEnter", AlertTooltip)
   row.alert:SetScript("OnLeave", Hide)
+
+  -- where and when it shows (ConditionsOptions.lua): the row's rules, or its own
+  row.where = ns.T.Button(row, 52, 20, "Where")
+  row.where:SetPoint("TOPRIGHT", 0, -26)
+  row.where:SetScript("OnClick", function(self)
+    ns.OpenConditions(self:GetParent().entry, self)
+  end)
+  row.where:SetScript("OnEnter", function(self)
+    ns.ConditionsTooltip(self, self:GetParent().entry)
+  end)
+  row.where:SetScript("OnLeave", Hide)
 
   trackedList.rows[index] = row
   return row
@@ -200,6 +211,10 @@ local function RefreshTracked()
     row.mode:SetText(ns.MODE_LABELS[entry.mode])
     row.item:SetText(ItemLabel(entry))
     row.alert:SetChecked(entry.alert or false)
+    -- green text: the buff has its own rules (the tooltip says which)
+    row.where.textColor = entry.conditions and { 0.25, 1, 0.25 } or nil
+    local color = row.where.textColor or ns.T.GOLD
+    row.where.label:SetTextColor(color[1], color[2], color[3])
     row:Show()
     used = index
   end
@@ -249,6 +264,7 @@ local function RefreshPicker()
 end
 
 function ns.RefreshOptions()
+  ns.RefreshConditions()
   if not (panel and panel:IsVisible()) then
     return
   end
@@ -335,8 +351,19 @@ function ns.CreateOptions()
   trackedTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 60)
 
   -- "Add Mage basics": the class buffs you know (Core.lua, ns.PRESETS). Hidden for other classes.
-  presetButton = ns.T.Button(panel, LEFT_WIDTH, 22)
-  presetButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 82)
+  -- where and when the whole row shows (ConditionsOptions.lua)
+  rowWhere = ns.T.Button(panel, 132, 22, "Where the row shows")
+  rowWhere:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 82)
+  rowWhere:SetScript("OnClick", function(self)
+    ns.OpenConditions("row", self)
+  end)
+  rowWhere:SetScript("OnEnter", function(self)
+    ns.ConditionsTooltip(self, "row")
+  end)
+  rowWhere:SetScript("OnLeave", Hide)
+
+  presetButton = ns.T.Button(panel, LEFT_WIDTH - 138, 22)
+  presetButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16 + 138, top - 82)
   presetButton:SetScript("OnClick", function()
     ns.AddPreset()
   end)

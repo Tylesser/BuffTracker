@@ -12,10 +12,12 @@
 
 Tylesser.lua
 Core.lua
+Conditions.lua
 Display.lua
 Party.lua
 Dispel.lua
 Options.lua
+ConditionsOptions.lua
 PartyOptions.lua
 DispelOptions.lua
 Events.lua

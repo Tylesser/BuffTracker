@@ -21,6 +21,20 @@ Shared conventions, release steps and the game client are in the workspace file 
   the buff's name; `ns.ClickAction(entry)` is that item while you have it, else the known spell. Class basics:
   `ns.PRESETS` (a nested list = replacements, first known wins; `"blessing"` = the player's own `ns.BlessingFor`
   choice), `ns.PresetBuffs` / `ns.AddPreset` (`/btrack basics`).
+- `Conditions.lua` (2026-11-20, the user's "hide my tracked buffs in dungeons and raids, show them in a party
+  out in the world"): where and when the row shows, on top of each buff's mode. A set is `{ places = { [key] = false },
+  groups = { [key] = false }, combat = "in" | "out" | nil }` (false = hidden there, nil = shown, so old saves show
+  everywhere): places `ns.PLACES` world / rest (IsResting) / dungeon (instance "party", "scenario") / raid / pvp
+  (battleground, arena) from `ns.CurrentPlace`, groups `ns.GROUPS` solo / party / raid from `ns.CurrentGroup`,
+  combat via `ns.InCombatNow` (also true while PLAYER_REGEN_DISABLED runs: `ns.combatStarting`). The row's set is
+  `db.conditions`, a buff's own `entry.conditions` (`ns.EntryConditions`; `ns.SetOwnConditions` copies the row's to
+  start), `ns.SetCondition(target, kind, key, value)`, `ns.ConditionsText` for the summaries. `ShouldShow` in
+  Display.lua tests them first (unlocked = everything shows); at PLAYER_REGEN_DISABLED the row is redrawn with
+  `ns.combatStarting` set, so LayoutClicks keeps the secure overlays hidden. ZONE_CHANGED_NEW_AREA /
+  PLAYER_UPDATE_RESTING / GROUP_ROSTER_UPDATE only redraw (no rescan). `ns.shownEntries` = what the row shows (tests).
+  Lua trap met here: `value == false and false or nil` is always nil. `ConditionsOptions.lua`: the window (Where /
+  Group / Combat check boxes, "Its own rules" for a buff, summary), opened by "Where the row shows" above the list and
+  each row's "Where" button (green text = own rules). The twin copy is in Codex's Modules/Buffs (same body).
 - `Display.lua`: the row of icons, centered on a draggable anchor, and `ns.Tick` (countdown and rescans). While
   `EditModeManagerFrame` is shown (hooked OnShow/OnHide, only on clients that have it) the row acts unlocked without
   changing `locked`. The position stays in `x`, `y`, not in Edit Mode layouts. An icon whose entry uses an item shows

@@ -256,7 +256,7 @@ end
 -- Out of combat only. shown: the entries shown, in icon order. A click casts the buff's spell
 -- (type spell) or uses its item (type item; on a weapon slot through target-slot).
 local function LayoutClicks(shown, size)
-  if InCombatLockdown() then
+  if InCombatLockdown() or ns.combatStarting then
     return
   end
   local used = 0
@@ -304,13 +304,26 @@ combatFrame:SetScript("OnEvent", function(_, event)
     if not InCombatLockdown() then
       HideClicks()
     end
+    -- "only in combat" / "only out of combat" icons change now; the click overlays stay hidden
+    if ns.db then
+      ns.combatStarting = true
+      pcall(ns.UpdateDisplay)
+      ns.combatStarting = false
+    end
   elseif ns.db then
     ns.UpdateDisplay()
   end
 end)
 
 local function ShouldShow(entry, state)
-  if entry.mode == "always" or IsUnlocked() then
+  if IsUnlocked() then
+    return true
+  end
+  -- where and when (Conditions.lua): the buff's own rules, else the row's
+  if not ns.ConditionsMet(ns.EntryConditions(entry)) then
+    return false
+  end
+  if entry.mode == "always" then
     return true
   end
   if not (state and state.known) then
@@ -349,6 +362,7 @@ function ns.UpdateDisplay()
       shown[#shown + 1] = entry
     end
   end
+  ns.shownEntries = shown -- (what the row shows now: the conditions' checks and /btrack debug read it)
 
   local rowWidth = math.max(#shown * size + math.max(#shown - 1, 0) * GAP, size)
   anchor:SetSize(rowWidth, size)
