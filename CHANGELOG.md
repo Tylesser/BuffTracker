@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.0
+
+- **Resurrect the dead.** When a party or raid member dies (and hasn't released), their buff buttons give way to one button with your class's resurrection spell (Resurrection, Redemption, Ancestral Spirit, Rebirth...): click it to raise them. It dims while someone else is already resurrecting them. Like every party button it appears out of combat. Untick **Resurrect the dead** on the Party buffs page to turn it off.
+
 ## 1.7.0
 
 - **Choose where and when the row shows.** Click **Where the row shows** above the tracked list and tick the places (open world, cities and inns, dungeons, raids, battlegrounds and arenas), the group (solo, in a party, in a raid group) and the combat state (in and out of combat, only in combat, only out of combat) to show the icons in. For example: hidden in dungeons and raids, but shown in a party out in the world. A buff can have its own rules: click **Where** under it (its button turns green). While you move the row, every icon shows.

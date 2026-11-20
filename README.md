@@ -43,6 +43,7 @@ When a party member is missing one of your group buffs, a small button with the 
 - **Ending soon:** buffs that end within a minute also get a button, so you can refresh them in time. Click the time on the options page to pick 10 sec, 30 sec, 1 min, 2 min or 5 min, or untick the box to only show missing buffs.
 - Works with Blizzard's party frames, raid-style party frames, ElvUI and FlareUI, and finds the party frames of most other unit frame addons too. Your own buffs are in the icon row, so your own frame gets no buttons, except in raid-style party frames.
 - **In a raid** every member is covered, with small buttons in the top right corner of each raid frame (at most a third of its width). **Raid buttons hide during combat**, so a click on a raid frame always reaches the frame, for healing. Untick **Buttons on raid frames** on the Party buffs page to have none in raids.
+- **Resurrect the dead:** a member who died (and hasn't released) gets one button with your class's resurrection spell in place of their buffs. It dims while someone else is already resurrecting them. Untick **Resurrect the dead** to turn it off.
 
 **In combat** the game doesn't let addons add, move or remove these buttons. Buttons that are already there keep working, and a buff that lands only dims its button. Everything updates as soon as combat ends.
 

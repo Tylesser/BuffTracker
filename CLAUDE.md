@@ -52,6 +52,12 @@ Shared conventions, release steps and the game client are in the workspace file 
   12-14 px, in at most a third of its width (`InsideFit`); party buttons sit beside the frame as before. Option
   `party.raid` ("Buttons on raid frames", default on) turns raid buttons off. A layout sets attributes and points only
   when unit, spell, frame, size or side changed (fields on the button), so the 1 sec refresh only recolors.
+  Resurrection (2026-11-21, the user's request; the same code in Codex's copy): `ns.NeedsRes(unit)` = online, not
+  you, `UnitIsDead` and not `UnitIsGhost` (a released spirit can't be raised by a spell; secret answers = no);
+  such a member gets one button (`button.res`) with `ns.ResSpell()` (first known of `ns.RES_SPELLS`) instead of
+  buffs / dispels. Dimmed (0.4, grey) while `UnitHasIncomingResurrection`; `INCOMING_RESURRECT_CHANGED` redraws.
+  Option `party.res` (nil = on, "Resurrect the dead"). Deaths are seen by the 1 sec refresh; in combat nothing
+  secure changes, as for every button. Codex's copy colours with `ns.GREY` / nil (it has no `ns.T` colours).
   `UpdateLooks` dims a button (0.25, grey) when its frame now shows another unit (secure headers reshuffle in combat).
   Frame names to check are built once (`PARTY_FRAME_NAMES`, `RAID_FRAME_NAMES` incl. ElvUI Raid1-3). In a raid only
   units with `UNIT_AURA` are read again (`MarkStale`; player/partyN map to raidN through `raidOf`, built once per roster

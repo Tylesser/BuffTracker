@@ -5,7 +5,7 @@ local _, ns = ...
 -- and per party member.
 
 local ROW_HEIGHT = 24
-local HEADING_Y = -204 -- below the page header (ns.T.OPTIONS_TOP) and the three check boxes
+local HEADING_Y = -228 -- below the page header (ns.T.OPTIONS_TOP) and the four check boxes
 local LIST_Y = HEADING_Y - 22
 local LEFT_X, LEFT_WIDTH = 16, 290
 local RIGHT_X, RIGHT_WIDTH = 330, 250
@@ -18,7 +18,7 @@ end
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 
 local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton, allBlessingsCheck, reagentButton
-local raidCheck
+local raidCheck, resCheck
 local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
@@ -248,6 +248,7 @@ function ns.RefreshPartyOptions()
   refreshCheck:SetChecked(ns.db.party.refresh)
   allBlessingsCheck:SetChecked(ns.db.party.allBlessings)
   raidCheck:SetChecked(ns.db.party.raid)
+  resCheck:SetChecked(ns.db.party.res ~= false)
   refreshButton:SetText(ns.FormatSeconds(ns.db.party.refreshSeconds))
   refreshButton:SetEnabled(ns.db.party.refresh)
   rangeCheck:SetChecked(ns.db.party.range)
@@ -314,6 +315,25 @@ function ns.CreatePartyOptions()
     GameTooltip:Show()
   end)
   raidCheck:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+
+  resCheck = CheckBox(panel, "Resurrect the dead")
+  resCheck:SetPoint("TOPLEFT", raidCheck, "BOTTOMLEFT", 0, 2)
+  resCheck:SetHitRectInsets(0, -(resCheck.Text:GetStringWidth() + 4), 0, 0)
+  resCheck:SetScript("OnClick", function(self)
+    ns.db.party.res = self:GetChecked() and true or false
+    ns.PartyChanged()
+  end)
+  resCheck:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Resurrect the dead")
+    GameTooltip:AddLine("A dead party or raid member (not released) gets a button with your class's resurrection "
+      .. "spell instead of their buff buttons. Dimmed while someone is already resurrecting them. Out of combat, "
+      .. "like every button here.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  resCheck:SetScript("OnLeave", function()
     GameTooltip:Hide()
   end)
 

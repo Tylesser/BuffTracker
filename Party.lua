@@ -399,6 +399,48 @@ local function DispelsOn()
   return ns.db.dispel.party and #ns.DispelSpells() > 0
 end
 
+-- Resurrection (the user's request, 2026-11-21): a dead group member (dead, not released: a spirit can't be raised by
+-- a spell) gets one button with your class's resurrection spell, the first you know, in place of the buff and
+-- dispel buttons they can't take while dead. Out of combat, as every party button (a druid's Rebirth button made
+-- before a fight still works in it). Option `party.res` (default on).
+ns.RES_SPELLS = { "Resurrection", "Redemption", "Ancestral Spirit", "Revive", "Resuscitate", "Return", "Raise Ally",
+  "Rebirth" }
+
+function ns.ResSpell()
+  for _, name in ipairs(ns.RES_SPELLS) do
+    if ns.KnowsSpell(name) then
+      return { name = name }
+    end
+  end
+  return nil
+end
+
+local function Plain(value)
+  if value == nil or (issecretvalue and issecretvalue(value)) then
+    return nil
+  end
+  return value
+end
+
+-- Dead and still in their body (UnitIsDead true, UnitIsGhost not), online; unreadable = no.
+function ns.NeedsRes(unit)
+  if not (UnitExists(unit) and UnitIsConnected(unit)) or UnitIsUnit(unit, "player") then
+    return false
+  end
+  local dead = Plain(UnitIsDead and UnitIsDead(unit))
+  local ghost = Plain(UnitIsGhost and UnitIsGhost(unit))
+  return dead == true and ghost ~= true
+end
+
+local function ResOn()
+  return ns.db.party.res ~= false and ns.ResSpell() ~= nil
+end
+
+-- Someone is already raising them (a resurrection cast on them, or one waiting for them to accept).
+local function ResComing(unit)
+  return Plain(UnitHasIncomingResurrection and UnitHasIncomingResurrection(unit)) == true
+end
+
 local function ScanUnit(unit)
   if DispelsOn() then
     removable[unit] = ns.RemovableDebuffs(ns.ReadDebuffs(unit, ns.DISPEL_FILTER))
@@ -742,6 +784,18 @@ local function GroupUnits()
 end
 
 local function ShowTooltip(self)
+  if self.res then
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(self.spell.name)
+    local who = GetUnitName(self.unit, false) or self.unit
+    if ResComing(self.unit) then
+      GameTooltip:AddLine(who .. " is already being resurrected.", 0.6, 0.6, 0.6)
+    else
+      GameTooltip:AddLine(who .. " is dead: click to resurrect.", 1, 0.3, 0.3)
+    end
+    GameTooltip:Show()
+    return
+  end
   if self.dispel then
     if self:GetAlpha() == 0 then
       return -- an empty spot in combat
@@ -943,7 +997,22 @@ end
 local function UpdateLooks()
   for _, row in pairs(buttons) do
     for _, button in ipairs(row) do
-      if button:IsShown() and button.dispel then
+      if button:IsShown() and button.res then
+        -- a resurrection: dimmed while someone is already raising them, red when out of range
+        local coming = ResComing(button.unit)
+        local reachable = InRange(button.spell.name, button.unit)
+        local _, noMana = IsUsable(button.spell.name)
+        button.icon:SetDesaturated(coming)
+        button:SetAlpha(coming and 0.4 or 1)
+        ns.SetFrameColor(button, coming and ns.T.GREY or ns.T.GOLD_DEEP)
+        if not reachable then
+          button.icon:SetVertexColor(1, 0.3, 0.3)
+        elseif noMana then
+          button.icon:SetVertexColor(0.4, 0.4, 1)
+        else
+          button.icon:SetVertexColor(1, 1, 1)
+        end
+      elseif button:IsShown() and button.dispel then
         DispelLooks(button)
       elseif button:IsShown() and button.family then
         local unit, spell = button.unit, button.spell
@@ -1199,7 +1268,8 @@ function ns.UpdateParty()
   local party = ns.db.party
   local wantBuffs = party.enabled and (party.raid or not raid)
   local wantDispels = DispelsOn()
-  local show = IsInGroup() and (wantBuffs or wantDispels)
+  local wantRes = ResOn()
+  local show = IsInGroup() and (wantBuffs or wantDispels or wantRes)
   local frames = show and FindFrames(units, raid) or {}
   local needsOf, placeOf = {}, {}
   for _, unit in ipairs(units) do
@@ -1210,6 +1280,9 @@ function ns.UpdateParty()
       size, limit = InsideFit(frame)
     end
     local reachable = frame and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and not TooFar(unit)
+    if frame and wantRes and ns.NeedsRes(unit) and not TooFar(unit) then
+      needs[1] = { res = true, spell = ns.ResSpell() }
+    end
     if reachable and wantBuffs and auras[unit] then
       local families, extra = FamiliesFor(unit)
       for _, family in ipairs(families) do
@@ -1247,6 +1320,7 @@ function ns.UpdateParty()
         button.family, button.fellBack, button.extra = need.family, need.fellBack, need.extra
         button.everyBlessing = need.everyBlessing
         button.dispel = need.dispel
+        button.res = need.res
         ns.ApplyShape(button, ns.IsRound())
         if not (button:IsShown() and button.unit == unit and button.spell == need.spell and button.frame == place.frame
           and button.size == place.size and button.side == place.side) then
@@ -1259,7 +1333,7 @@ function ns.UpdateParty()
           button:Show()
         end
       else
-        button.family, button.frame, button.dispel = nil, nil, nil
+        button.family, button.frame, button.dispel, button.res = nil, nil, nil, nil
         if button:IsShown() then
           button:Hide()
         end
@@ -1279,7 +1353,7 @@ local eventFrame = CreateFrame("Frame")
 for _, event in ipairs({
   "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED",
   "SPELLS_CHANGED",
-  "BAG_UPDATE_DELAYED", "UNIT_AURA", "UNIT_CONNECTION", "UNIT_FLAGS",
+  "BAG_UPDATE_DELAYED", "UNIT_AURA", "UNIT_CONNECTION", "UNIT_FLAGS", "INCOMING_RESURRECT_CHANGED",
 }) do
   pcall(eventFrame.RegisterEvent, eventFrame, event)
 end
@@ -1322,7 +1396,8 @@ eventFrame:SetScript("OnEvent", function(_, event, unit)
   if not ns.db then
     return
   end
-  if event == "UNIT_AURA" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
+  if event == "UNIT_AURA" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS"
+    or event == "INCOMING_RESURRECT_CHANGED" then
     if not IsGroupUnit(unit) then
       return
     end
