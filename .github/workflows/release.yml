@@ -26,3 +26,52 @@ jobs:
 
       - name: Package and upload
         uses: BigWigsMods/packager@v2
+
+      # The release in the Tylesser Discord's #announcements (webhook = organization secret DISCORD_RELEASE_WEBHOOK):
+      # the version's CHANGELOG section and the download links. Skipped when the secret is missing; never fails the job.
+      - name: Post the release in Discord
+        continue-on-error: true
+        env:
+          DISCORD_RELEASE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          python3 - <<'PY'
+          import glob, json, os, re, urllib.request
+          hook = os.environ.get("DISCORD_RELEASE_WEBHOOK", "")
+          if not hook:
+              print("no DISCORD_RELEASE_WEBHOOK: skipped")
+              raise SystemExit(0)
+          tag, repo = os.environ["TAG"], os.environ["REPO"]
+          version = tag[1:] if tag.startswith("v") else tag
+          toc = open(sorted(glob.glob("*.toc"))[0], encoding="utf-8").read()
+          def field(name):
+              m = re.search(r"^## %s:\s*(.+)$" % name, toc, re.M)
+              return m.group(1).strip() if m else ""
+          title = field("Title") or repo
+          section, keep = [], False
+          for line in open("CHANGELOG.md", encoding="utf-8"):
+              if line.startswith("## "):
+                  if keep:
+                      break
+                  keep = line[3:].strip() == version
+                  continue
+              if keep:
+                  section.append(line.rstrip())
+          notes = "\n".join(section).strip() or "See the changelog."
+          if len(notes) > 1500:
+              notes = notes[:1500].rsplit("\n", 1)[0] + "\n…"
+          links = ["[tylesser.com](<https://tylesser.com/%s/>)" % repo.lower()]
+          if field("X-Curse-Project-ID"):
+              links.append("[CurseForge](<https://www.curseforge.com/projects/%s>)" % field("X-Curse-Project-ID"))
+          if field("X-Wago-ID"):
+              links.append("[Wago](<https://addons.wago.io/addons/%s>)" % field("X-Wago-ID"))
+          beta = " (beta)" if "beta" in version.lower() else ""
+          content = "**%s %s**%s is out\n%s\n\n%s" % (title, version, beta, notes, " · ".join(links))
+          body = json.dumps({"username": "Tylesser releases", "content": content[:2000],
+                             "allowed_mentions": {"parse": []}}).encode()
+          req = urllib.request.Request(hook, data=body, method="POST",
+                                       headers={"Content-Type": "application/json", "User-Agent": "TylesserRelease"})
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              print("posted to Discord:", resp.status)
+          PY

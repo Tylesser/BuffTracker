@@ -92,6 +92,8 @@ WoW Forever and Retail can hide buff details from addons at times, such as durin
 
 Found a bug or have an idea? Click **Feedback** on the options page or type `/btrack feedback` in game to get the link, or go straight to [tylesser.com/feedback](https://tylesser.com/feedback/#bufftracker).
 
+No GitHub account? Join the [Tylesser Discord](https://discord.gg/n2rEB6mRxF) and post in #bug-reports or #ideas with the addon's tag; each post is copied to GitHub and the bot answers with the link.
+
 ## Installation
 
 Install from CurseForge, or download the latest zip from [Releases](https://github.com/Tylesser/BuffTracker/releases) and extract it to `Interface/AddOns`. The folder must be named `BuffTracker`.
