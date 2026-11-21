@@ -47,6 +47,27 @@ local function Plain(value)
   return value
 end
 
+-- Whether two units are the same person: true or false, or nil when the game keeps the answer secret
+-- (UnitIsUnit is SecretWhenUnitComparisonRestricted on Forever, e.g. an aura's caster in a raid; testing or comparing
+-- a secret boolean is an error: the user's "attempt to compare local 'same' (a secret boolean value)", 2026-11-21).
+function ns.SameUnit(a, b)
+  if type(a) ~= "string" or type(b) ~= "string" then
+    return nil
+  end
+  if a == b then
+    return true
+  end
+  local ok, same = pcall(UnitIsUnit, a, b)
+  if not ok then
+    return nil
+  end
+  same = Plain(same)
+  if same == nil then
+    return nil
+  end
+  return same and true or false
+end
+
 local function GetBuff(unit, index)
   if C_UnitAuras and C_UnitAuras.GetBuffDataByIndex then
     return C_UnitAuras.GetBuffDataByIndex(unit, index)
@@ -87,8 +108,11 @@ function ns.ReadBuffs(unit)
         local source, fromPlayer = Plain(aura.sourceUnit), Plain(aura.isFromPlayerOrPlayerPet)
         local mine
         if type(source) == "string" then
-          local ok, same = pcall(UnitIsUnit, source, "player")
-          mine = source == "player" or (ok and same == true)
+          -- unknown (a secret answer) stays nil: the game doesn't say
+          local same = ns.SameUnit(source, "player")
+          if same ~= nil then
+            mine = same
+          end
         elseif fromPlayer == false then
           mine = false
         end

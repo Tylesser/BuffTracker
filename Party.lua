@@ -89,7 +89,7 @@ end
 -- hidden only when one of those proves they're too far.
 local function TooFar(unit)
   local party = ns.db.party
-  if not party.range or UnitIsUnit(unit, "player") then
+  if not party.range or ns.SameUnit(unit, "player") == true then
     return false
   end
   local limit = party.rangeYards
@@ -148,7 +148,8 @@ ns.GROUP_BUFFS = {
 ns.BLESSINGS = {}
 for _, blessing in ipairs({ "Might", "Wisdom", "Kings", "Salvation", "Light", "Sanctuary" }) do
   table.insert(ns.BLESSINGS, { key = blessing:lower(), label = blessing, blessing = true, spells = {
-    { name = "Greater Blessing of " .. blessing, reagents = REAGENTS.symbol }, { name = "Blessing of " .. blessing } } })
+    { name = "Greater Blessing of " .. blessing, reagents = REAGENTS.symbol, greater = true },
+    { name = "Blessing of " .. blessing } } })
 end
 ns.DEFAULT_BLESSINGS = {
   WARRIOR = "might", ROGUE = "might", HUNTER = "might", DEATHKNIGHT = "might",
@@ -370,12 +371,19 @@ local function InRange(name, unit)
   return result ~= false and result ~= 0
 end
 
+-- Greater Blessings only in a raid (the user's choice, 2026-11-21): in a party, or alone, the buttons cast the
+-- normal blessing. A Greater Blessing still counts as having the blessing.
+local function Skipped(family, spell)
+  return family.blessing and spell.greater and not (IsInRaid and IsInRaid()) and true or false
+end
+ns.SkippedSpell = Skipped
+
 -- The spell to cast for a buff: the first known one that can be cast. Being low on mana doesn't
 -- count, as the cheaper spell wouldn't fix that. Returns the spell and whether it's a fallback.
 function ns.ChooseSpell(family)
   local firstKnown
   for _, spell in ipairs(family.spells) do
-    if ns.KnowsSpell(spell.name) then
+    if ns.KnowsSpell(spell.name) and not Skipped(family, spell) then
       firstKnown = firstKnown or spell
       local usable, noMana = IsUsable(spell.name)
       if usable or noMana then
@@ -424,7 +432,7 @@ end
 
 -- Dead and still in their body (UnitIsDead true, UnitIsGhost not), online; unreadable = no.
 function ns.NeedsRes(unit)
-  if not (UnitExists(unit) and UnitIsConnected(unit)) or UnitIsUnit(unit, "player") then
+  if not (UnitExists(unit) and UnitIsConnected(unit)) or ns.SameUnit(unit, "player") == true then
     return false
   end
   local dead = Plain(UnitIsDead and UnitIsDead(unit))
@@ -665,7 +673,7 @@ local function SearchMatch(frame, unit)
   if type(frameUnit) ~= "string" or ownButtons[frame] then
     return false
   end
-  if frameUnit ~= unit and not (frameUnit:find("^raid%d+$") and UnitIsUnit(frameUnit, unit)) then
+  if frameUnit ~= unit and not (frameUnit:find("^raid%d+$") and ns.SameUnit(frameUnit, unit) == true) then
     return false
   end
   if (frame.IsForbidden and frame:IsForbidden()) or not frame:IsVisible() then
@@ -731,7 +739,7 @@ local function FindFrames(units, raid)
         else
           -- the frame shows the person by another unit ID (raidN in a party, partyN in a raid)
           for _, unit in ipairs(units) do
-            if wanted[unit] and not frames[unit] and UnitIsUnit(frameUnit, unit) then
+            if wanted[unit] and not frames[unit] and ns.SameUnit(frameUnit, unit) == true then
               frames[unit] = frame
             end
           end
@@ -743,7 +751,7 @@ local function FindFrames(units, raid)
   -- Any other unit frame addon: members only, your own frame is left out.
   local missing = {}
   for _, unit in ipairs(units) do
-    if wanted[unit] and not frames[unit] and unit ~= "player" and not UnitIsUnit(unit, "player") then
+    if wanted[unit] and not frames[unit] and unit ~= "player" and ns.SameUnit(unit, "player") ~= true then
       local frame = found[unit]
       if frame and IsMatch(frame, unit) then
         frames[unit] = frame
@@ -960,7 +968,8 @@ end
 -- Whether a secure group frame now shows someone else (they can reshuffle in combat).
 local function FrameMoved(button)
   local frameUnit = button.frame and FrameUnit(button.frame)
-  return frameUnit ~= nil and frameUnit ~= button.unit and not UnitIsUnit(frameUnit, button.unit)
+  -- unknown (secret) = not moved: nothing changes on a guess
+  return frameUnit ~= nil and frameUnit ~= button.unit and ns.SameUnit(frameUnit, button.unit) == false
 end
 
 -- A dispel button: the icon of the first debuff it removes, in that debuff type's color.
@@ -1375,7 +1384,7 @@ local function MapRaidUnits()
   for _, unit in ipairs(PARTY_UNITS) do
     if UnitExists(unit) then
       for i = 1, count do
-        if UnitIsUnit(RAID_UNITS[i], unit) then
+        if ns.SameUnit(RAID_UNITS[i], unit) == true then
           raidOf[unit] = RAID_UNITS[i]
           break
         end

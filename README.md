@@ -32,7 +32,7 @@ When a party member is missing one of your group buffs, a small button with the 
   - Prayer of Fortitude (Holy or Sacred Candle) → Power Word: Fortitude
   - Prayer of Spirit → Divine Spirit, Prayer of Shadow Protection → Shadow Protection (Sacred Candle)
   - Gift of the Wild (Wild Berries or Wild Thornroot) → Mark of the Wild
-  - Greater Blessing (Symbol of Kings) → Blessing
+  - Greater Blessing (Symbol of Kings) → Blessing, but only in a raid: in a party, or alone, the buttons cast the normal Blessing
 - **Only where it helps.** Arcane Intellect and Divine Spirit aren't offered to warriors and rogues. Members who are dead or offline get no buttons.
 - **Paladin blessings:** choose a blessing for each class, like Might for warriors and Wisdom for casters, and change it for single party members. A member's own choice is kept by name.
 - **Every blessing when it helps (paladins):** when a member has no blessing at all, or another paladin already gave them the one you chose, a button appears for each blessing they don't have yet, so you can pick one that isn't taken. Once they have a blessing from you, the others go away. Blessings from other paladins never hide yours, as each paladin keeps one blessing of their own on a member. When the game doesn't say who cast a blessing, only your chosen one shows. Turn this off on the options page to only see the chosen blessing.
