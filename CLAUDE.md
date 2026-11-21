@@ -21,6 +21,13 @@ Shared conventions, release steps and the game client are in the workspace file 
   the buff's name; `ns.ClickAction(entry)` is that item while you have it, else the known spell. Class basics:
   `ns.PRESETS` (a nested list = replacements, first known wins; `"blessing"` = the player's own `ns.BlessingFor`
   choice), `ns.PresetBuffs` / `ns.AddPreset` (`/btrack basics`).
+- Unwanted buffs (2026-11-21, the user: "if those conditions are not met and the player has it, warn him to remove
+  it, but optional"): `db.warnUnwanted` (default false, one check in the conditions window). `ns.Unwanted(entry,
+  state)` = option on, the buff has rules (`ConditionsText` not "Everywhere"), they aren't met, and it is on. The row
+  shows it (ShouldShow) red with "remove" as its time text, prints once per spell until it stops being unwanted
+  (`ns.warnedUnwanted`), and its secure overlay is `type = "cancelaura"` with `spell` (or `target-slot` 16/17 for a
+  weapon enchant; forever SecureTemplates.lua SECURE_ACTIONS.cancelaura), also with "Click icons to cast" off.
+  `ns.RowIcon(entry)` / `ns.RowClick(entry)` give the shown icon / overlay (tests). Same in Codex Modules/Buffs.
 - `Conditions.lua` (2026-11-20, the user's "hide my tracked buffs in dungeons and raids, show them in a party
   out in the world"): where and when the row shows, on top of each buff's mode. A set is `{ places = { [key] = false },
   groups = { [key] = false }, combat = "in" | "out" | nil }` (false = hidden there, nil = shown, so old saves show

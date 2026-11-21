@@ -211,7 +211,12 @@ local function ShowClickTooltip(self)
   GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
   GameTooltip:AddLine(self.spellName)
   local action = self.action
-  if action and action.item then
+  if action and action.remove then
+    local entry = self.entry
+    GameTooltip:AddLine("On, but its rules say not here: "
+      .. (entry and ns.ConditionsText(ns.EntryConditions(entry)) or "?") .. ".", 1, 0.3, 0.3, true)
+    GameTooltip:AddLine("Click to remove it.", 0.6, 0.6, 0.6)
+  elseif action and action.item then
     local name = ns.ItemName(action.item) or ("item " .. action.item)
     local where = action.slot == 17 and " on your off-hand weapon" or action.slot and " on your main-hand weapon" or ""
     GameTooltip:AddLine(string.format("Click to use %s%s (%d left).", name, where, ns.ItemCount(action.item)),
@@ -260,10 +265,12 @@ local function LayoutClicks(shown, size)
     return
   end
   local used = 0
-  if not IsUnlocked() and ns.db.clickToCast then
+  if not IsUnlocked() then
     for index, entry in ipairs(shown) do
       local x, y = icons[index]:GetCenter()
-      local action = x and ns.ClickAction(entry)
+      -- an unwanted buff's click removes it (with or without "Click icons to cast"); else the cast, when on
+      local unwanted = ns.Unwanted(entry, ns.StateOf(entry))
+      local action = x and (unwanted and ns.RemoveAction(entry) or (ns.db.clickToCast and ns.ClickAction(entry)))
       if action then
         used = used + 1
         local click = GetClick(used)
@@ -273,7 +280,12 @@ local function LayoutClicks(shown, size)
         click:SetFrameStrata(anchor:GetFrameStrata())
         click:SetFrameLevel(icons[index]:GetFrameLevel() + 5)
         ns.ApplyShape(click, ns.IsRound())
-        if action.item then
+        if action.remove then
+          click:SetAttribute("type", "cancelaura")
+          click:SetAttribute("item", nil)
+          click:SetAttribute("spell", action.spell)
+          click:SetAttribute("target-slot", action.slot)
+        elseif action.item then
           click:SetAttribute("type", "item")
           click:SetAttribute("spell", nil)
           click:SetAttribute("item", "item:" .. action.item)
@@ -286,6 +298,7 @@ local function LayoutClicks(shown, size)
         end
         click.spellName = entry.name
         click.action = action
+        click.entry = entry
         click:Show()
       end
     end
@@ -315,13 +328,16 @@ combatFrame:SetScript("OnEvent", function(_, event)
   end
 end)
 
+ns.warnedUnwanted = {} -- lower-case names already named in chat while unwanted
+
 local function ShouldShow(entry, state)
   if IsUnlocked() then
     return true
   end
   -- where and when (Conditions.lua): the buff's own rules, else the row's
   if not ns.ConditionsMet(ns.EntryConditions(entry)) then
-    return false
+    -- optional: on where its rules say no, it shows as "remove" (Conditions.lua ns.Unwanted)
+    return ns.Unwanted(entry, state)
   end
   if entry.mode == "always" then
     return true
@@ -336,6 +352,11 @@ local function ShouldShow(entry, state)
 end
 
 local function UpdateTime(icon)
+  if icon.unwanted then
+    icon.time:SetText("remove")
+    icon.time:SetTextColor(1, 0.3, 0.3)
+    return
+  end
   local state = icon.state
   local expires = state and state.active and state.expires or 0
   if expires > 0 then
@@ -385,10 +406,25 @@ function ns.UpdateDisplay()
     icon.state = state
     icon.entry = entry
     icon.texture:SetTexture(ns.EntryIcon(entry))
+    local unwanted = not IsUnlocked() and ns.Unwanted(entry, state)
+    icon.unwanted = unwanted
     icon.texture:SetDesaturated(not active)
     -- Missing: ruby border and a ruby stud. Active: gold. Not read yet (may or may not be on): grey.
     icon.stud:SetShown(missing or false)
-    if missing then
+    if unwanted then
+      -- on where its rules say no: the "missing" red, the icon in full colour, "remove" under it
+      ns.SetFrameColor(icon, ns.T.RUBY)
+      icon.texture:SetVertexColor(1, 1, 1)
+      if icon.stud then
+        icon.stud:Show()
+      end
+      local key = entry.name:lower()
+      if not ns.warnedUnwanted[key] then
+        ns.warnedUnwanted[key] = true
+        print(ns.PREFIX .. entry.name .. " is on, but its rules say not here ("
+          .. ns.ConditionsText(ns.EntryConditions(entry)):lower() .. "). Click its icon to remove it (out of combat).")
+      end
+    elseif missing then
       ns.SetFrameColor(icon, ns.T.RUBY)
       icon.texture:SetVertexColor(1, 0.5, 0.5)
     elseif active then
@@ -419,7 +455,20 @@ function ns.UpdateDisplay()
       Flash(icon)
     end
   end
+  -- a buff no longer unwanted may be named again the next time
+  for key in pairs(ns.warnedUnwanted) do
+    local still = false
+    for _, entry in ipairs(shown) do
+      if entry.name:lower() == key and ns.Unwanted(entry, ns.StateOf(entry)) then
+        still = true
+      end
+    end
+    if not still then
+      ns.warnedUnwanted[key] = nil
+    end
+  end
   for index = #shown + 1, #icons do
+    icons[index].unwanted = nil
     icons[index].state = nil
     icons[index].entry = nil
     icons[index]:Hide()
@@ -431,6 +480,26 @@ function ns.UpdateDisplay()
   mover:SetShown(unlocked)
   LayoutClicks(shown, size)
   ns.UpdateSelfDispel()
+end
+
+-- The row's icon frame of a tracked entry while it shows (checks, /btrack debug), or nil.
+function ns.RowIcon(entry)
+  for _, icon in ipairs(icons) do
+    if icon.entry == entry and icon:IsShown() then
+      return icon
+    end
+  end
+  return nil
+end
+
+-- The secure click overlay laid over an entry's icon (out of combat), or nil.
+function ns.RowClick(entry)
+  for _, click in ipairs(clicks) do
+    if click.entry == entry and click:IsShown() then
+      return click
+    end
+  end
+  return nil
 end
 
 -- For your own dispel buttons (Dispel.lua), placed under the row.

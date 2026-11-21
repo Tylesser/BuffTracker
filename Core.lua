@@ -8,6 +8,7 @@ ns.defaults = {
   locked = true,
   iconSize = 36,
   clickToCast = true,
+  warnUnwanted = false, -- warn when a buff is on where its rules say no (Conditions.lua ns.Unwanted)
   iconShape = "square",
 }
 

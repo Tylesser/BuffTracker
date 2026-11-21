@@ -111,6 +111,36 @@ function ns.ConditionsMet(conditions)
   return true
 end
 
+-- "Warn me to remove it" (optional, off by default; the user's request, 2026-11-21): a buff that has rules, is on, and
+-- is somewhere its rules say no (Righteous Fury out of a dungeon, say) shows in the row as "remove", is named once in
+-- chat, and its icon's click removes it (out of combat: the secure "cancelaura" action, forever SecureTemplates.lua).
+function ns.Unwanted(entry, state)
+  if not (ns.db and ns.db.warnUnwanted and entry) then
+    return false
+  end
+  local conditions = ns.EntryConditions(entry)
+  if type(conditions) ~= "table" or ns.ConditionsText(conditions) == "Everywhere" or ns.ConditionsMet(conditions) then
+    return false
+  end
+  return state and state.known and state.active and true or false
+end
+
+-- What a click does on an unwanted buff's icon: remove it by name, or a weapon enchant by its slot.
+function ns.RemoveAction(entry)
+  if entry.slot then
+    return { remove = true, slot = entry.slot }
+  end
+  return { remove = true, spell = entry.name }
+end
+
+function ns.SetWarnUnwanted(on)
+  ns.db.warnUnwanted = on and true or false
+  ns.UpdateDisplay()
+  if ns.RefreshConditions then
+    ns.RefreshConditions()
+  end
+end
+
 -- The conditions a buff follows: its own, else the row's.
 function ns.EntryConditions(entry)
   return entry and entry.conditions or ns.db.conditions
