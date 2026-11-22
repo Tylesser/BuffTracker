@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.0
+
+- New: **talents in "Where buffs show"**. Show a tracked buff only with your primary or your secondary talents (dual spec), on WoW Forever and the Classic versions. Switching talents updates the row.
+- Party buttons, WoW Forever: a member with a **camp buff** (Boosted Stamina from a First Aid Kit, Boosted Intellect, Boosted Attack Power...) already has the class buff it stands in for, as the two don't stack, so no button offers that buff.
+
 ## 1.9.0
 
 - New, optional: **warn me to remove a buff** that is on where its rules say no (tick it in the "Where buffs show" window). Its icon shows in red with "remove" under it, chat names it once, and a click on the icon removes it (out of combat). Off by default.

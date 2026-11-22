@@ -42,6 +42,14 @@ Shared conventions, release steps and the game client are in the workspace file 
   Lua trap met here: `value == false and false or nil` is always nil. `ConditionsOptions.lua`: the window (Where /
   Group / Combat check boxes, "Its own rules" for a buff, summary), opened by "Where the row shows" above the list and
   each row's "Where" button (green text = own rules). The twin copy is in Codex's Modules/Buffs (same body).
+  Talents (2026-11-22): `talents = { primary / secondary = false }`, `ns.TALENTS`, `ns.CurrentTalents()`
+  (C_SpecializationInfo.GetActiveSpecGroup, else GetActiveTalentGroup; a secret or missing answer = primary),
+  `ns.HasTalentGroups()` (false on Retail: there a talent group is a specialization, and the window has no Talents
+  section); ACTIVE_TALENT_GROUP_CHANGED redraws (registered in pcall).
+- Camp buffs (Party.lua `ns.CAMP_BUFFS`, 2026-11-22): WoW Forever's camp features give "Boosted ..." auras that don't
+  stack with a class buff (Forever wiki, Camping). By spell ID (two are named "Boosted Stats"): ReadBuffs keeps
+  `spellId`, ScanUnit fills `camps[unit]`, `Remaining()` counts a camp buff as its family (not `HasAnyBlessing`: a
+  camp buff isn't another paladin's blessing). IDs from Forever's SpellName / SpellEffect tables (wago.tools `wowf`).
 - `Display.lua`: the row of icons, centered on a draggable anchor, and `ns.Tick` (countdown and rescans). While
   `EditModeManagerFrame` is shown (hooked OnShow/OnHide, only on clients that have it) the row acts unlocked without
   changing `locked`. The position stays in `x`, `y`, not in Edit Mode layouts. An icon whose entry uses an item shows

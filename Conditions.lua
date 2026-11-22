@@ -7,7 +7,11 @@ local _, ns = ...
 --           and arenas (IsInInstance's type, else IsResting)
 --   group:  solo, in a party, in a raid group (IsInRaid, IsInGroup)
 --   combat: in and out of combat, only in combat, only out of combat
--- A condition set is { places = { [key] = false }, groups = { [key] = false }, combat = "in" | "out" | nil }: false =
+--   talents: with your primary or secondary talents (dual spec; 2026-11-22), where the game has them:
+--           C_SpecializationInfo.GetActiveSpecGroup (Forever's own talent frame uses it), else
+--           GetActiveTalentGroup; not on Retail, where you have one talent group per specialization
+-- A condition set is { places = { [key] = false }, groups = { [key] = false }, talents = { [key] = false },
+-- combat = "in" | "out" | nil }: false =
 -- hidden there, nil = shown (so entries saved before conditions existed show everywhere, as before). The whole row
 -- has one set (`db.conditions`); a buff with its own (`entry.conditions`) uses that instead. While the row is
 -- unlocked (moving it, Edit Mode) every icon shows, as before. The icons are plain frames, so they may change in a
@@ -29,6 +33,11 @@ ns.COMBAT = {
   { key = "any", label = "In and out of combat" },
   { key = "in", label = "Only in combat" },
   { key = "out", label = "Only out of combat" },
+}
+
+ns.TALENTS = {
+  { key = "primary", label = "Primary talents" },
+  { key = "secondary", label = "Secondary talents" },
 }
 
 local function Plain(value)
@@ -82,6 +91,31 @@ function ns.CurrentGroup()
   return "solo"
 end
 
+-- Whether this game has two talent groups to choose between (dual spec): Forever, the Classic versions; not Retail.
+function ns.HasTalentGroups()
+  if WOW_PROJECT_ID and WOW_PROJECT_MAINLINE and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+    return false
+  end
+  return (C_SpecializationInfo and type(C_SpecializationInfo.GetActiveSpecGroup) == "function")
+    or type(GetActiveTalentGroup) == "function"
+end
+
+-- Your active talents: "primary" or "secondary"; nil while the game doesn't know them yet (early in a login: the
+-- talents rule then hides nothing, and PLAYER_TALENT_UPDATE redraws the row).
+function ns.CurrentTalents()
+  if C_SpecializationInfo and Ask(C_SpecializationInfo.IsInitialized) == false then
+    return nil
+  end
+  local group
+  if C_SpecializationInfo then
+    group = Ask(C_SpecializationInfo.GetActiveSpecGroup)
+  end
+  if group == nil then
+    group = Ask(GetActiveTalentGroup)
+  end
+  return group == 2 and "secondary" or "primary"
+end
+
 -- In a fight (also while PLAYER_REGEN_DISABLED runs, before the lockdown starts).
 function ns.InCombatNow()
   if ns.combatStarting then
@@ -101,6 +135,10 @@ function ns.ConditionsMet(conditions)
     return false
   end
   if type(conditions.groups) == "table" and conditions.groups[ns.CurrentGroup()] == false then
+    return false
+  end
+  local talents = type(conditions.talents) == "table" and ns.HasTalentGroups() and ns.CurrentTalents()
+  if talents and conditions.talents[talents] == false then
     return false
   end
   if conditions.combat == "in" and not ns.InCombatNow() then
@@ -147,13 +185,16 @@ function ns.EntryConditions(entry)
 end
 
 function ns.CopyConditions(conditions)
-  local copy = { places = {}, groups = {} }
+  local copy = { places = {}, groups = {}, talents = {} }
   if type(conditions) == "table" then
     for key, value in pairs(conditions.places or {}) do
       copy.places[key] = value
     end
     for key, value in pairs(conditions.groups or {}) do
       copy.groups[key] = value
+    end
+    for key, value in pairs(conditions.talents or {}) do
+      copy.talents[key] = value
     end
     copy.combat = conditions.combat
   end
@@ -190,6 +231,16 @@ function ns.ConditionsText(conditions)
     parts[#parts + 1] = "not " .. (#groups > 1 and table.concat(groups, ", ", 1, #groups - 1) .. " or "
       .. groups[#groups] or groups[1])
   end
+  if conditions.talents and ns.HasTalentGroups() then
+    local primary, secondary = conditions.talents.primary ~= false, conditions.talents.secondary ~= false
+    if not primary and not secondary then
+      parts[#parts + 1] = "never with either talents"
+    elseif not primary then
+      parts[#parts + 1] = "only with secondary talents"
+    elseif not secondary then
+      parts[#parts + 1] = "only with primary talents"
+    end
+  end
   if conditions.combat == "in" then
     parts[#parts + 1] = "only in combat"
   elseif conditions.combat == "out" then
@@ -202,7 +253,8 @@ function ns.ConditionsText(conditions)
   return text:sub(1, 1):upper() .. text:sub(2)
 end
 
--- Sets one condition. `target` = "row" or a tracked entry; kind = "place" / "group" / "combat"; for place and group,
+-- Sets one condition. `target` = "row" or a tracked entry; kind = "place" / "group" / "talents" / "combat"; for
+-- place, group and talents,
 -- `on` = shown there; for combat, `value` = "any" / "in" / "out".
 function ns.SetCondition(target, kind, key, value)
   local conditions
@@ -215,6 +267,7 @@ function ns.SetCondition(target, kind, key, value)
   end
   conditions.places = conditions.places or {}
   conditions.groups = conditions.groups or {}
+  conditions.talents = conditions.talents or {}
   -- (false = hidden there; `value == false and false or nil` would always give nil)
   local hidden = nil
   if value == false then
@@ -224,6 +277,8 @@ function ns.SetCondition(target, kind, key, value)
     conditions.places[key] = hidden
   elseif kind == "group" then
     conditions.groups[key] = hidden
+  elseif kind == "talents" then
+    conditions.talents[key] = hidden
   elseif kind == "combat" then
     conditions.combat = (key == "in" or key == "out") and key or nil
   end

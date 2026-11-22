@@ -75,10 +75,10 @@ local function GetBuff(unit, index)
   elseif C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
     return C_UnitAuras.GetAuraDataByIndex(unit, index, "HELPFUL")
   end
-  local name, icon, count, _, duration, expirationTime, source = UnitAura(unit, index, "HELPFUL")
+  local name, icon, count, _, duration, expirationTime, source, _, _, spellId = UnitAura(unit, index, "HELPFUL")
   if name then
     return { name = name, icon = icon, applications = count, duration = duration, expirationTime = expirationTime,
-      sourceUnit = source }
+      sourceUnit = source, spellId = spellId }
   end
 end
 
@@ -123,6 +123,7 @@ function ns.ReadBuffs(unit)
           count = Plain(aura.applications) or 0,
           expires = Plain(aura.expirationTime) or 0,
           mine = mine,
+          spellId = Plain(aura.spellId), -- (camp buffs, Party.lua ns.CAMP_BUFFS)
         }
       end
     end

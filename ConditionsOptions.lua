@@ -2,9 +2,11 @@ local _, ns = ...
 
 -- The "Where buffs show" window (Conditions.lua has the rules): opened from "Where the row shows" above the tracked
 -- list (the whole row) and from each tracked buff's "Where" button (that buff: its own rules, or the row's).
--- Where / Group: tick what to show in; Combat: one of three. A buff following the row shows the row's choices greyed.
+-- Where / Talents (dual spec) / Group: tick what to show in; Combat: one of three. A buff following the row shows
+-- the row's choices greyed.
 
 local WIDTH, HEIGHT = 420, 318
+local TALENTS_HEIGHT = 62 -- the Talents section, where the game has dual spec
 local window
 
 local function Hide()
@@ -37,7 +39,7 @@ end
 
 local function Build()
   window = CreateFrame("Frame", "BuffTrackerConditions", UIParent)
-  window:SetSize(WIDTH, HEIGHT)
+  window:SetSize(WIDTH, HEIGHT + (ns.HasTalentGroups() and TALENTS_HEIGHT or 0))
   window:SetFrameStrata("DIALOG")
   window:SetClampedToScreen(true)
   window:EnableMouse(true)
@@ -78,6 +80,23 @@ local function Build()
     check.key = place.key
     window.places[#window.places + 1] = check
     last = check
+  end
+
+  -- dual spec (Conditions.lua ns.TALENTS), under Where; only where the game has two talent groups
+  window.talents = {}
+  if ns.HasTalentGroups() then
+    local talents = ns.T.Heading(window, "Talents", 180)
+    talents:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -10)
+    last = talents
+    for _, choice in ipairs(ns.TALENTS) do
+      local check = MakeCheck(window, choice.label, function(self)
+        ns.SetCondition(Target(), "talents", choice.key, self:GetChecked() and true or false)
+      end)
+      check:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, last == talents and -4 or 2)
+      check.key = choice.key
+      window.talents[#window.talents + 1] = check
+      last = check
+    end
   end
 
   local right = ns.T.Heading(window, "Group", 180)
@@ -152,6 +171,9 @@ function ns.RefreshConditions()
   end
   for _, check in ipairs(window.groups) do
     Ready(check, not (conditions.groups and conditions.groups[check.key] == false))
+  end
+  for _, check in ipairs(window.talents) do
+    Ready(check, not (conditions.talents and conditions.talents[check.key] == false))
   end
   local combat = conditions.combat or "any"
   for _, check in ipairs(window.combat) do

@@ -151,6 +151,20 @@ for _, blessing in ipairs({ "Might", "Wisdom", "Kings", "Salvation", "Light", "S
     { name = "Greater Blessing of " .. blessing, reagents = REAGENTS.symbol, greater = true },
     { name = "Blessing of " .. blessing } } })
 end
+-- WoW Forever's camp buffs (Camping: a profession's feature at a campfire) don't stack with the class buff of the
+-- same kind (the Forever wiki's Camping page, 2026-11-22), so a member with one already has that buff: no button
+-- offers a cast that would do nothing. By spell ID from Forever's spell tables: two different camp buffs are both
+-- called "Boosted Stats". (Strength of Earth Totem and Moonkin Aura have camp twins too, but aren't cast here.)
+ns.CAMP_BUFFS = {
+  [1230124] = "fortitude", -- Boosted Stamina (First Aid Kit)
+  [1229513] = "intellect", -- Boosted Intellect (Incense Candle)
+  [1229718] = "spirit", -- Boosted Spirit (Faction Banner)
+  [1230653] = "wild", -- Boosted Stats: all stats, armor, resistances (Enchanted Lute)
+  [1230098] = "kings", -- Boosted Stats: 8% stats (Fish Bowl)
+  [1230164] = "might", -- Boosted Attack Power (Lodestone)
+  [1230587] = "wisdom", -- Boosted Mana Regeneration (Mana Well)
+}
+
 ns.DEFAULT_BLESSINGS = {
   WARRIOR = "might", ROGUE = "might", HUNTER = "might", DEATHKNIGHT = "might",
   PALADIN = "wisdom", PRIEST = "wisdom", MAGE = "wisdom", WARLOCK = "wisdom", DRUID = "wisdom", SHAMAN = "wisdom",
@@ -399,6 +413,8 @@ local auras = {}
 -- Who cast those buffs, when it may be you: lower-case name -> true (you), or "unknown" (the game
 -- doesn't say). Buffs from someone else are left out.
 local fromMe = {}
+-- [unit] = { [family key] = expires } for camp buffs (ns.CAMP_BUFFS) on the unit
+local camps = {}
 -- Debuffs you can remove, per unit: { [dispel spell] = { debuff, ... } } (ns.RemovableDebuffs).
 local removable = {}
 
@@ -459,9 +475,13 @@ local function ScanUnit(unit)
   if not complete and auras[unit] then
     return -- hidden right now: keep what we knew
   end
-  local found, mine = {}, {}
+  local found, mine, camp = {}, {}, {}
   for _, buff in ipairs(buffs) do
     found[buff.name:lower()] = buff.expires
+    local campKey = buff.spellId and ns.CAMP_BUFFS[buff.spellId]
+    if campKey then
+      camp[campKey] = buff.expires
+    end
     if buff.mine == true then
       mine[buff.name:lower()] = true
     elseif buff.mine == nil and not mine[buff.name:lower()] then
@@ -470,10 +490,12 @@ local function ScanUnit(unit)
   end
   auras[unit] = complete and found or nil
   fromMe[unit] = complete and mine or nil
+  camps[unit] = complete and camp or nil
 end
 
--- Seconds left on any spell of the family; nil when the unit doesn't have it.
-local function Remaining(unit, family)
+-- Seconds left on any spell of the family, or on a camp buff that takes its place (unless noCamp); nil when the
+-- unit doesn't have it.
+local function Remaining(unit, family, noCamp)
   local found = auras[unit]
   local best
   for _, spell in ipairs(family.spells) do
@@ -484,6 +506,13 @@ local function Remaining(unit, family)
       end
       best = math.max(best or 0, expires - GetTime())
     end
+  end
+  local camp = not noCamp and camps[unit] and family.key and camps[unit][family.key]
+  if camp then
+    if camp == 0 then
+      return math.huge
+    end
+    best = math.max(best or 0, camp - GetTime())
   end
   return best
 end
@@ -518,7 +547,7 @@ end
 
 local function HasAnyBlessing(unit)
   for _, family in ipairs(ns.BLESSINGS) do
-    if Remaining(unit, family) then
+    if Remaining(unit, family, true) then -- a camp buff isn't a paladin's blessing
       return true
     end
   end
@@ -1251,6 +1280,7 @@ function ns.UpdateParty()
     inGroup[unit] = true
     if not UnitExists(unit) then
       auras[unit] = nil
+      camps[unit] = nil
     elseif not raid or rescanAll or stale[unit] or not auras[unit] then
       ScanUnit(unit)
     end
@@ -1262,7 +1292,7 @@ function ns.UpdateParty()
   end
   for unit in pairs(auras) do
     if not inGroup[unit] then
-      auras[unit], fromMe[unit] = nil, nil
+      auras[unit], fromMe[unit], camps[unit] = nil, nil, nil
     end
   end
   stale, rescanAll = {}, false
