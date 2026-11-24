@@ -1,0 +1,10 @@
+version: 2
+# Keeps the pinned GitHub Actions (full commit SHAs) up to date: one grouped pull request a month.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

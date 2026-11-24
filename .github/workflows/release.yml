@@ -20,12 +20,12 @@ jobs:
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
       - name: Package and upload
-        uses: BigWigsMods/packager@v2
+        uses: BigWigsMods/packager@01e8631a69c69d7654c788d152630d5fed9e3812 # v2
 
       # The release in the Tylesser Discord's #announcements (webhook = organization secret DISCORD_RELEASE_WEBHOOK):
       # the version's CHANGELOG section and the download links. Skipped when the secret is missing; never fails the job.
