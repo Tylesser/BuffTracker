@@ -14,7 +14,8 @@ pcall(eventFrame.RegisterEvent, eventFrame, "WEAPON_ENCHANT_CHANGED") -- Retail 
 pcall(eventFrame.RegisterEvent, eventFrame, "MINIMAP_UPDATE_TRACKING") -- Find Minerals etc. switched
 -- where and when the row shows (Conditions.lua): only a redraw, no rescan (group updates come often in a raid)
 local CONDITION_EVENTS = { ZONE_CHANGED_NEW_AREA = true, PLAYER_UPDATE_RESTING = true, GROUP_ROSTER_UPDATE = true,
-  ACTIVE_TALENT_GROUP_CHANGED = true, PLAYER_TALENT_UPDATE = true } -- (talents: also once known after a login)
+  ACTIVE_TALENT_GROUP_CHANGED = true, PLAYER_TALENT_UPDATE = true, -- (talents: also once known after a login)
+  PLAYER_ROLES_ASSIGNED = true }
 for event in pairs(CONDITION_EVENTS) do
   pcall(eventFrame.RegisterEvent, eventFrame, event) -- (the talent event: not in every game)
 end

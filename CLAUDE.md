@@ -46,6 +46,10 @@ Shared conventions, release steps and the game client are in the workspace file 
   (C_SpecializationInfo.GetActiveSpecGroup, else GetActiveTalentGroup; a secret or missing answer = primary),
   `ns.HasTalentGroups()` (false on Retail: there a talent group is a specialization, and the window has no Talents
   section); ACTIVE_TALENT_GROUP_CHANGED redraws (registered in pcall).
+  Role (2026-11-26, the user's request): `roles = { tank / healer / damage / none = false }`, `ns.ROLES`,
+  `ns.CurrentRole()` (UnitGroupRolesAssigned("player"): TANK / HEALER / DAMAGER / NONE; secret or unknown = nil,
+  which hides nothing), `ns.HasRoles()` (the function exists); the window's Role section sits under Group
+  (`ROLES_HEIGHT`); PLAYER_ROLES_ASSIGNED redraws. Codex's Modules/Buffs/Conditions.lua is this file.
 - Camp buffs (Party.lua `ns.CAMP_BUFFS`, 2026-11-22): WoW Forever's camp features give "Boosted ..." auras that don't
   stack with a class buff (Forever wiki, Camping). By spell ID (two are named "Boosted Stats"): ReadBuffs keeps
   `spellId`, ScanUnit fills `camps[unit]`, `Remaining()` counts a camp buff as its family (not `HasAnyBlessing`: a

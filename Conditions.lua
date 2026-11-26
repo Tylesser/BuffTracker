@@ -10,7 +10,11 @@ local _, ns = ...
 --   talents: with your primary or secondary talents (dual spec; 2026-11-22), where the game has them:
 --           C_SpecializationInfo.GetActiveSpecGroup (Forever's own talent frame uses it), else
 --           GetActiveTalentGroup; not on Retail, where you have one talent group per specialization
+--   role:   your group role (2026-11-26, the user's request): tank, healer, damage, or no role set
+--           (UnitGroupRolesAssigned("player"): TANK / HEALER / DAMAGER / NONE; a role the game doesn't tell
+--           hides nothing)
 -- A condition set is { places = { [key] = false }, groups = { [key] = false }, talents = { [key] = false },
+-- roles = { [key] = false },
 -- combat = "in" | "out" | nil }: false =
 -- hidden there, nil = shown (so entries saved before conditions existed show everywhere, as before). The whole row
 -- has one set (`db.conditions`); a buff with its own (`entry.conditions`) uses that instead. While the row is
@@ -39,6 +43,14 @@ ns.TALENTS = {
   { key = "primary", label = "Primary talents" },
   { key = "secondary", label = "Secondary talents" },
 }
+
+ns.ROLES = {
+  { key = "tank", label = "Tank", text = "as tank" },
+  { key = "healer", label = "Healer", text = "as healer" },
+  { key = "damage", label = "Damage", text = "as damage" },
+  { key = "none", label = "No role set", text = "with no role set" },
+}
+local ROLE_KEYS = { TANK = "tank", HEALER = "healer", DAMAGER = "damage", NONE = "none" }
 
 local function Plain(value)
   if value == nil then
@@ -116,6 +128,17 @@ function ns.CurrentTalents()
   return group == 2 and "secondary" or "primary"
 end
 
+-- Whether this game has group roles (UnitGroupRolesAssigned).
+function ns.HasRoles()
+  return type(UnitGroupRolesAssigned) == "function"
+end
+
+-- Your group role: "tank", "healer", "damage" or "none"; nil when the game doesn't say.
+function ns.CurrentRole()
+  local role = Ask(UnitGroupRolesAssigned, "player")
+  return type(role) == "string" and ROLE_KEYS[role] or nil
+end
+
 -- In a fight (also while PLAYER_REGEN_DISABLED runs, before the lockdown starts).
 function ns.InCombatNow()
   if ns.combatStarting then
@@ -139,6 +162,10 @@ function ns.ConditionsMet(conditions)
   end
   local talents = type(conditions.talents) == "table" and ns.HasTalentGroups() and ns.CurrentTalents()
   if talents and conditions.talents[talents] == false then
+    return false
+  end
+  local role = type(conditions.roles) == "table" and ns.HasRoles() and ns.CurrentRole()
+  if role and conditions.roles[role] == false then
     return false
   end
   if conditions.combat == "in" and not ns.InCombatNow() then
@@ -185,7 +212,7 @@ function ns.EntryConditions(entry)
 end
 
 function ns.CopyConditions(conditions)
-  local copy = { places = {}, groups = {}, talents = {} }
+  local copy = { places = {}, groups = {}, talents = {}, roles = {} }
   if type(conditions) == "table" then
     for key, value in pairs(conditions.places or {}) do
       copy.places[key] = value
@@ -195,6 +222,9 @@ function ns.CopyConditions(conditions)
     end
     for key, value in pairs(conditions.talents or {}) do
       copy.talents[key] = value
+    end
+    for key, value in pairs(conditions.roles or {}) do
+      copy.roles[key] = value
     end
     copy.combat = conditions.combat
   end
@@ -241,6 +271,20 @@ function ns.ConditionsText(conditions)
       parts[#parts + 1] = "only with primary talents"
     end
   end
+  if conditions.roles and ns.HasRoles() then
+    local shown = {}
+    for _, role in ipairs(ns.ROLES) do
+      if conditions.roles[role.key] ~= false then
+        shown[#shown + 1] = role.text
+      end
+    end
+    if #shown == 0 then
+      parts[#parts + 1] = "never with any role"
+    elseif #shown < #ns.ROLES then
+      parts[#parts + 1] = "only " .. (#shown > 1 and table.concat(shown, ", ", 1, #shown - 1) .. " or "
+        .. shown[#shown] or shown[1])
+    end
+  end
   if conditions.combat == "in" then
     parts[#parts + 1] = "only in combat"
   elseif conditions.combat == "out" then
@@ -253,8 +297,8 @@ function ns.ConditionsText(conditions)
   return text:sub(1, 1):upper() .. text:sub(2)
 end
 
--- Sets one condition. `target` = "row" or a tracked entry; kind = "place" / "group" / "talents" / "combat"; for
--- place, group and talents,
+-- Sets one condition. `target` = "row" or a tracked entry; kind = "place" / "group" / "talents" / "role" /
+-- "combat"; for place, group, talents and role,
 -- `on` = shown there; for combat, `value` = "any" / "in" / "out".
 function ns.SetCondition(target, kind, key, value)
   local conditions
@@ -268,6 +312,7 @@ function ns.SetCondition(target, kind, key, value)
   conditions.places = conditions.places or {}
   conditions.groups = conditions.groups or {}
   conditions.talents = conditions.talents or {}
+  conditions.roles = conditions.roles or {}
   -- (false = hidden there; `value == false and false or nil` would always give nil)
   local hidden = nil
   if value == false then
@@ -279,6 +324,8 @@ function ns.SetCondition(target, kind, key, value)
     conditions.groups[key] = hidden
   elseif kind == "talents" then
     conditions.talents[key] = hidden
+  elseif kind == "role" then
+    conditions.roles[key] = hidden
   elseif kind == "combat" then
     conditions.combat = (key == "in" or key == "out") and key or nil
   end

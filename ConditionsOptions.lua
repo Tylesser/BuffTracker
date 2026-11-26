@@ -2,11 +2,12 @@ local _, ns = ...
 
 -- The "Where buffs show" window (Conditions.lua has the rules): opened from "Where the row shows" above the tracked
 -- list (the whole row) and from each tracked buff's "Where" button (that buff: its own rules, or the row's).
--- Where / Talents (dual spec) / Group: tick what to show in; Combat: one of three. A buff following the row shows
--- the row's choices greyed.
+-- Where / Talents (dual spec) / Group / Role (group roles): tick what to show in; Combat: one of three. A buff
+-- following the row shows the row's choices greyed.
 
 local WIDTH, HEIGHT = 420, 318
 local TALENTS_HEIGHT = 62 -- the Talents section, where the game has dual spec
+local ROLES_HEIGHT = 96 -- the Role section (group roles), under Group
 local window
 
 local function Hide()
@@ -39,7 +40,7 @@ end
 
 local function Build()
   window = CreateFrame("Frame", "BuffTrackerConditions", UIParent)
-  window:SetSize(WIDTH, HEIGHT + (ns.HasTalentGroups() and TALENTS_HEIGHT or 0))
+  window:SetSize(WIDTH, HEIGHT + (ns.HasTalentGroups() and TALENTS_HEIGHT or 0) + (ns.HasRoles() and ROLES_HEIGHT or 0))
   window:SetFrameStrata("DIALOG")
   window:SetClampedToScreen(true)
   window:EnableMouse(true)
@@ -113,6 +114,23 @@ local function Build()
     last = check
   end
 
+  -- group role (Conditions.lua ns.ROLES), under Group; only where the game has roles
+  window.roles = {}
+  if ns.HasRoles() then
+    local roles = ns.T.Heading(window, "Role", 180)
+    roles:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -8)
+    last = roles
+    for _, role in ipairs(ns.ROLES) do
+      local check = MakeCheck(window, role.label, function(self)
+        ns.SetCondition(Target(), "role", role.key, self:GetChecked() and true or false)
+      end)
+      check:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, last == roles and -4 or 2)
+      check.key = role.key
+      window.roles[#window.roles + 1] = check
+      last = check
+    end
+  end
+
   local combat = ns.T.Heading(window, "Combat", 180)
   combat:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -8)
   window.combat = {}
@@ -174,6 +192,9 @@ function ns.RefreshConditions()
   end
   for _, check in ipairs(window.talents) do
     Ready(check, not (conditions.talents and conditions.talents[check.key] == false))
+  end
+  for _, check in ipairs(window.roles) do
+    Ready(check, not (conditions.roles and conditions.roles[check.key] == false))
   end
   local combat = conditions.combat or "any"
   for _, check in ipairs(window.combat) do

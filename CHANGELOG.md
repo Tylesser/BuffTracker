@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.0
+
+- New: **your group role in "Where buffs show"**. Show a tracked buff only as tank, healer or damage, or with no role set (where the game has group roles). A role change updates the row.
+
 ## 1.10.0
 
 - New: **talents in "Where buffs show"**. Show a tracked buff only with your primary or your secondary talents (dual spec), on WoW Forever and the Classic versions. Switching talents updates the row.
