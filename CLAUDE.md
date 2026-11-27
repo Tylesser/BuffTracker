@@ -7,6 +7,10 @@ Shared conventions, release steps and the game client are in the workspace file 
 - `Tylesser.lua`: the shared Tylesser "Runestone" look (`ns.T`: stone panels, gold borders, studs, Cinzel, buttons,
   check boxes, options page header, chat prefix). Loaded first. The same file is in every Tylesser addon: edit them together
   (see the workspace CLAUDE.md).
+- `Locales.lua` (2026-11-27): the German, French, Spanish, Russian and Portuguese texts for every `L["..."]` (rules in
+  `tools/harness/L10N.md`). Spell names never go through L (`ns.LocalSpell`); weapon enchant entries keep their English
+  `name` as the saved key and show `ns.EntryName(entry)`; debuff types stay English keys and are shown through
+  Dispel.lua's labels; the condition summary builds from per-language phrases (`text` fields, `L["%s and %s"]`).
 - `Core.lua`: defaults for `BuffTrackerDB` (`SavedVariablesPerCharacter`: `tracked`, `locked`, `iconSize`, `clickToCast`, `iconShape`, and `x`, `y` once the row has been moved; before that it sits at the top center of the screen), reading
   the player's buffs, `ns.state` per lowercase buff name, adding and removing buffs, and the spellbook list for the
   options page. A tracked entry is `{ name, icon, mode }`, where mode is `always`, `active` or `missing`, plus optional

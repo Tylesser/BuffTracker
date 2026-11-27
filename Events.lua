@@ -1,4 +1,5 @@
 local addonName, ns = ...
+local L = ns.L
 
 local TICK_SECONDS = 0.2
 
@@ -35,7 +36,7 @@ local function Setup()
   ns.CreateOptions()
   ns.CreatePartyOptions()
   ns.CreateDispelOptions()
-  ns.T.AddCompartment({ text = ns.TITLE, onClick = ns.OpenOptions, tooltip = { "Click to open the options." } })
+  ns.T.AddCompartment({ text = ns.TITLE, onClick = ns.OpenOptions, tooltip = { L["Click to open the options."] } })
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, loadedName)
@@ -66,7 +67,7 @@ eventFrame:SetScript("OnEvent", function(self, event, loadedName)
   end
   if event == "PLAYER_ENTERING_WORLD" and #ns.db.tracked == 0 and not ns.db.welcomed then
     ns.db.welcomed = true
-    print(ns.PREFIX .. "type /btrack to choose the buffs to track.")
+    print(ns.PREFIX .. L["type %s to choose the buffs to track."]:format("/btrack"))
   end
   ns.Changed()
 end)
@@ -83,22 +84,22 @@ end)
 
 local function PrintList()
   if #ns.db.tracked == 0 then
-    print(ns.PREFIX .. "nothing tracked yet.")
+    print(ns.PREFIX .. L["nothing tracked yet."])
     return
   end
-  print(ns.PREFIX .. "tracked buffs:")
+  print(ns.PREFIX .. L["tracked buffs:"])
   for _, entry in ipairs(ns.db.tracked) do
     local state = ns.StateOf(entry)
-    local current = "|cffaaaaaaunknown|r"
+    local current = "|cffaaaaaa" .. L["unknown"] .. "|r"
     if state and state.active then
-      current = "|cff20ff20on|r"
+      current = "|cff20ff20" .. L["on"] .. "|r"
     elseif state and state.known then
-      current = "|cffff4040missing|r"
+      current = "|cffff4040" .. L["missing"] .. "|r"
     end
-    print("  " .. entry.name .. ": " .. current .. " (show: " .. ns.MODE_LABELS[entry.mode] .. ")")
+    print("  " .. L["%s: %s (show: %s)"]:format(ns.EntryName(entry), current, ns.MODE_LABELS[entry.mode]))
   end
   if not ns.scanComplete then
-    print("  The game is hiding your buffs right now, so these may be out of date.")
+    print("  " .. L["The game is hiding your buffs right now, so these may be out of date."])
   end
 end
 
@@ -114,15 +115,15 @@ SlashCmdList.BUFFTRACKER = function(msg)
   elseif command == "add" then
     local entry, reason = ns.AddBuff(rest)
     if entry then
-      print(ns.PREFIX .. "now tracking " .. entry.name .. ".")
+      print(ns.PREFIX .. L["now tracking %s."]:format(ns.EntryName(entry)))
     else
       print(ns.PREFIX .. reason)
     end
   elseif command == "remove" then
     if ns.RemoveBuff(rest) then
-      print(ns.PREFIX .. "stopped tracking " .. rest .. ".")
+      print(ns.PREFIX .. L["stopped tracking %s."]:format(rest))
     else
-      print(ns.PREFIX .. rest .. " is not tracked.")
+      print(ns.PREFIX .. L["%s is not tracked."]:format(rest))
     end
   elseif command == "basics" then
     ns.AddPreset()
@@ -132,19 +133,19 @@ SlashCmdList.BUFFTRACKER = function(msg)
     name = strtrim(name or rest)
     local entry = ns.FindTracked(name)
     if not entry then
-      print(ns.PREFIX .. (name ~= "" and name or "that buff") .. " is not tracked.")
+      print(ns.PREFIX .. L["%s is not tracked."]:format(name ~= "" and name or L["that buff"]))
     elseif not item or item == "" then
       ns.SetItem(entry, nil)
-      print(ns.PREFIX .. entry.name .. " no longer uses an item.")
+      print(ns.PREFIX .. L["%s no longer uses an item."]:format(ns.EntryName(entry)))
     else
       local id = ns.ResolveItem(item)
       if id and ns.IsEquippable(id) then
-        print(ns.PREFIX .. "that item is worn, not used: clicking it would equip it.")
+        print(ns.PREFIX .. L["that item is worn, not used: clicking it would equip it."])
       elseif id then
         ns.SetItem(entry, id)
-        print(ns.PREFIX .. "clicking " .. entry.name .. " now uses " .. (ns.ItemName(id) or ("item " .. id)) .. ".")
+        print(ns.PREFIX .. L["clicking %s now uses %s."]:format(ns.EntryName(entry), ns.ItemName(id) or L["item %s"]:format(id)))
       else
-        print(ns.PREFIX .. "no item called " .. item .. " found. Try its item ID, or shift-click it into the line.")
+        print(ns.PREFIX .. L["no item called %s found. Try its item ID, or shift-click it into the line."]:format(item))
       end
     end
   elseif command == "party" then
@@ -163,14 +164,15 @@ SlashCmdList.BUFFTRACKER = function(msg)
   elseif command == "reset" then
     ns.ResetPosition()
   else
-    print(ns.PREFIX .. "commands:")
-    print("  /btrack: open the options, /btrack party: party buff buttons and blessings")
-    print("  /btrack dispel: dispel buttons for your party and yourself")
-    print("  /btrack add <name or spell ID>, /btrack remove <name>, /btrack list")
-    print("  /btrack basics: track the basic buffs of your class")
-    print("  /btrack item <buff> = <item>: the item a click on that icon uses")
-    print("  /btrack lock, /btrack unlock, /btrack reset (put the icons back in place)")
-    print("  /btrack debug: show what the party buttons see")
-    print("  /btrack feedback: report a bug or suggest an idea")
+    print(ns.PREFIX .. L["commands:"])
+    print("  " .. L["%s: open the options, %s: party buff buttons and blessings"]:format("/btrack", "/btrack party"))
+    print("  /btrack dispel: " .. L["dispel buttons for your party and yourself"])
+    print("  " .. L["%s <name or spell ID>, %s <name>, %s"]:format("/btrack add", "/btrack remove", "/btrack list"))
+    print("  /btrack basics: " .. L["track the basic buffs of your class"])
+    print("  " .. L["%s <buff> = <item>: the item a click on that icon uses"]:format("/btrack item"))
+    print("  /btrack lock, /btrack unlock, /btrack reset (" .. L["put the icons back in place"] .. ")")
+    print("  /btrack debug: " .. L["show what the party buttons see"])
+    print("  /btrack feedback: " .. L["report a bug or suggest an idea"])
+
   end
 end

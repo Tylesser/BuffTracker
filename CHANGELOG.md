@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.0
+
+- **In your language**: German, French, Spanish, Russian and Brazilian Portuguese game clients now show the addon in their language (other clients stay in English). Russian clients get the game's own font for headings, since the addon's fonts have no Cyrillic letters.
+- **Other game languages**: party buff buttons, blessings, dispel buttons and "Add class basics" now work on German, French and other clients (they used the spells' English names, so no button showed).
+
 ## 1.11.1
 
 - Dispels: **debuffs now show in combat too**. In a fight WoW Forever hides a debuff's name and type from addons, so no dispel button lit up and no icon appeared. Now the game is asked which debuffs you can remove: if you know one dispel, its button lights up as before (with the spell's icon) and an icon appears where no button was; if you know several, an icon with your dispel's icon shows (not clickable, since the game doesn't say which spell fits).

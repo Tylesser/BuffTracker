@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 -- Buttons next to the party frames (in a raid: small, in a corner of the raid frames) for group
 -- buffs a member is missing. Clicking one casts the buff on that member. They are secure buttons:
@@ -36,9 +37,9 @@ ns.DEFAULT_REFRESH_SECONDS = 60
 
 function ns.FormatSeconds(seconds)
   if seconds >= 60 and seconds % 60 == 0 then
-    return string.format("%d min", seconds / 60)
+    return L["%d min"]:format(seconds / 60)
   end
-  return seconds .. " sec"
+  return L["%d sec"]:format(seconds)
 end
 
 -- "Hide when farther than": the choices, in yards.
@@ -146,8 +147,11 @@ ns.GROUP_BUFFS = {
 
 -- Paladin blessings: one per member, chosen by class or per member in the options.
 ns.BLESSINGS = {}
+-- label: shown in the options (the spells keep their English names here; ns.LocalSpell gives the client's)
+local BLESSING_LABELS = { Might = L["Might"], Wisdom = L["Wisdom"], Kings = L["Kings"], Salvation = L["Salvation"],
+  Light = L["Light"], Sanctuary = L["Sanctuary"] }
 for _, blessing in ipairs({ "Might", "Wisdom", "Kings", "Salvation", "Light", "Sanctuary" }) do
-  table.insert(ns.BLESSINGS, { key = blessing:lower(), label = blessing, blessing = true, spells = {
+  table.insert(ns.BLESSINGS, { key = blessing:lower(), label = BLESSING_LABELS[blessing], blessing = true, spells = {
     { name = "Greater Blessing of " .. blessing, reagents = REAGENTS.symbol, greater = true },
     { name = "Blessing of " .. blessing } } })
 end
@@ -224,7 +228,89 @@ function ns.KnowsSpell(name)
   return KnownByID(name)
 end
 
+-- One spell ID for each name in these lists (and the class basics), from the game's own tables (Forever's and
+-- Retail's SpellName / SkillLineAbility on wago.tools; TBC/Wrath-era spells by their usual IDs; a list = the first
+-- one the client knows: Forever's rune spell, then TBC's), so a client in
+-- another language uses its own names (2026-11-27: an audit found the party buff and dispel buttons matched only
+-- English names, so on a German client none showed). On English clients the names stay as written.
+ns.SPELL_IDS = {
+  ["Arcane Brilliance"] = 23028, ["Arcane Intellect"] = 1459, ["Prayer of Fortitude"] = 21562,
+  ["Power Word: Fortitude"] = 1243, ["Prayer of Spirit"] = 27681, ["Divine Spirit"] = 14752,
+  ["Prayer of Shadow Protection"] = 27683, ["Shadow Protection"] = 976, ["Gift of the Wild"] = 21849,
+  ["Mark of the Wild"] = 1126,
+  ["Greater Blessing of Might"] = 25782, ["Greater Blessing of Wisdom"] = 25894, ["Greater Blessing of Kings"] = 25898,
+  ["Greater Blessing of Salvation"] = 25895, ["Greater Blessing of Light"] = 25890,
+  ["Greater Blessing of Sanctuary"] = 25899,
+  ["Blessing of Might"] = 19740, ["Blessing of Wisdom"] = 19742, ["Blessing of Kings"] = 20217,
+  ["Blessing of Salvation"] = 1038, ["Blessing of Light"] = 19977, ["Blessing of Sanctuary"] = 20911,
+  ["Cleanse"] = 4987, ["Purify"] = 1152, ["Dispel Magic"] = 527, ["Abolish Disease"] = 552, ["Cure Disease"] = 528,
+  ["Cleanse Spirit"] = 51886, ["Cure Toxins"] = 526, ["Remove Curse"] = 2782, ["Remove Lesser Curse"] = 475,
+  ["Abolish Poison"] = 2893, ["Cure Poison"] = 526,
+  ["Cleanse Toxins"] = 213644, ["Purify Disease"] = 213634, ["Nature's Cure"] = 88423, ["Remove Corruption"] = 2782,
+  ["Purify Spirit"] = 77130, ["Detox"] = 115450, ["Naturalize"] = 360823, ["Cauterizing Flame"] = 374251,
+  ["Expunge"] = 365585,
+  ["Molten Armor"] = { 428741, 30482 }, ["Mage Armor"] = 6117, ["Ice Armor"] = 7302, ["Frost Armor"] = 168, ["Inner Fire"] = 588,
+  ["Thorns"] = 467, ["Fel Armor"] = { 403619, 28176 }, ["Demon Armor"] = 706, ["Demon Skin"] = 687, ["Battle Shout"] = 5242,
+  ["Trueshot Aura"] = 19506, ["Aspect of the Dragonhawk"] = 61846, ["Aspect of the Hawk"] = 13165,
+  ["Water Shield"] = { 408510, 24398 }, ["Lightning Shield"] = 324, ["Devotion Aura"] = 465, ["Horn of Winter"] = 57330,
+}
+local ENGLISH_CLIENTS = { enUS = true, enGB = true }
+
+local function SpellNameOf(id)
+  if C_Spell and C_Spell.GetSpellName then
+    local ok, name = pcall(C_Spell.GetSpellName, id)
+    if ok and type(name) == "string" and name ~= "" then
+      return name
+    end
+  end
+  if GetSpellInfo then
+    local ok, name = pcall(GetSpellInfo, id)
+    if ok and type(name) == "string" and name ~= "" then
+      return name
+    end
+  end
+end
+
+-- The client's own name for an English name of these lists (the name itself on English clients, or when the game
+-- doesn't know the spell).
+function ns.LocalSpell(name)
+  if type(name) ~= "string" then
+    return name
+  end
+  local locale = GetLocale and GetLocale()
+  if not locale or ENGLISH_CLIENTS[locale] then
+    return name
+  end
+  local ids = ns.SPELL_IDS[name]
+  for _, id in ipairs(type(ids) == "table" and ids or { ids }) do
+    local own = SpellNameOf(id)
+    if own then
+      return own
+    end
+  end
+  return name
+end
+
+-- Every spell of the buff and dispel lists gets its client name (`english` keeps the list's own).
+function ns.LocalizeSpellNames()
+  local function Each(spell)
+    spell.english = spell.english or spell.name
+    spell.name = ns.LocalSpell(spell.english)
+  end
+  for _, list in ipairs({ ns.GROUP_BUFFS, ns.BLESSINGS }) do
+    for _, family in ipairs(list) do
+      for _, spell in ipairs(family.spells) do
+        Each(spell)
+      end
+    end
+  end
+  for _, spell in ipairs(ns.DISPELS or {}) do
+    Each(spell)
+  end
+end
+
 function ns.RefreshKnown()
+  ns.LocalizeSpellNames()
   askedKnown = {}
   local known = {}
   for _, spell in ipairs(ns.GetSpellbook()) do
@@ -361,7 +447,7 @@ function ns.CheckReagents()
         castsAnyway = castsAnyway or CastsWithout(spell, count)
       end
       if not castsAnyway then
-        print(ns.PREFIX .. count .. " " .. (ItemName(watched.id) or ("item " .. watched.id)) .. " left.")
+        print(ns.PREFIX .. L["%d %s left."]:format(count, ItemName(watched.id) or L["item %s"]:format(watched.id)))
       end
     end
     reagentSeen[watched.id] = count
@@ -826,9 +912,9 @@ local function ShowTooltip(self)
     GameTooltip:AddLine(self.spell.name)
     local who = GetUnitName(self.unit, false) or self.unit
     if ResComing(self.unit) then
-      GameTooltip:AddLine(who .. " is already being resurrected.", 0.6, 0.6, 0.6)
+      GameTooltip:AddLine(L["%s is already being resurrected."]:format(who), 0.6, 0.6, 0.6)
     else
-      GameTooltip:AddLine(who .. " is dead: click to resurrect.", 1, 0.3, 0.3)
+      GameTooltip:AddLine(L["%s is dead: click to resurrect."]:format(who), 1, 0.3, 0.3)
     end
     GameTooltip:Show()
     return
@@ -850,34 +936,35 @@ local function ShowTooltip(self)
   local remaining = auras[self.unit] and Remaining(self.unit, self.family)
   if remaining then
     if remaining == math.huge then
-      GameTooltip:AddLine(who .. " has it now.", 0.6, 0.6, 0.6)
+      GameTooltip:AddLine(L["%s has it now."]:format(who), 0.6, 0.6, 0.6)
     else
-      GameTooltip:AddLine(string.format("Ends on %s in %d sec.", who, math.ceil(remaining)), 1, 1, 1)
+      GameTooltip:AddLine(L["Ends on %s in %d sec."]:format(who, math.ceil(remaining)), 1, 1, 1)
     end
   else
-    GameTooltip:AddLine("Missing on " .. who .. ".", 1, 0.3, 0.3)
+    GameTooltip:AddLine(L["Missing on %s."]:format(who), 1, 0.3, 0.3)
   end
   if self.spell.reagents then
-    local line = (ns.ReagentName(self.spell) or "Reagent") .. ": " .. ns.ReagentCount(self.spell)
+    local line = (ns.ReagentName(self.spell) or L["Reagent"]) .. ": " .. ns.ReagentCount(self.spell)
     if ns.ReagentLow(self.spell) then
-      GameTooltip:AddLine(line .. " (running low)", 1, 0.6, 0.2)
+      GameTooltip:AddLine(L["%s (running low)"]:format(line), 1, 0.6, 0.2)
     else
       GameTooltip:AddLine(line, 1, 1, 1)
     end
   end
   if self.fellBack then
     local preferred = self.family.spells[1]
-    GameTooltip:AddLine("Can't cast " .. preferred.name .. ", so this casts " .. self.spell.name .. ".",
+    GameTooltip:AddLine(L["Can't cast %s, so this casts %s."]:format(preferred.name, self.spell.name),
       1, 0.6, 0.2, true)
   end
   if self.extra then
-    GameTooltip:AddLine(who .. " has no blessing from you, so every blessing they're missing is shown.",
+    GameTooltip:AddLine(L["%s has no blessing from you, so every blessing they're missing is shown."]:format(who),
       0.6, 0.6, 0.6, true)
   end
   if self.family.blessing then
-    GameTooltip:AddLine("Change blessings: /btrack party", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Change blessings: %s"]:format("/btrack party"), 0.6, 0.6, 0.6)
   end
-  GameTooltip:AddLine("Click to cast.", 0.6, 0.6, 0.6)
+  GameTooltip:AddLine(L["Click to cast."], 0.6, 0.6, 0.6)
+
   GameTooltip:Show()
 end
 

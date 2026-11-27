@@ -89,6 +89,8 @@ Related buffs count separately. Gift of the Wild doesn't count as Mark of the Wi
 
 WoW Forever and Retail can hide buff details from addons at times, such as during combat. While buffs are hidden, each icon keeps what it last knew and keeps counting down. If the time runs out, the icon turns grey, because the addon can't tell whether the buff was refreshed. Everything updates again as soon as the game stops hiding buffs. While buffs are hidden the addon can't see one drop, so **Alert** can't go off then. Hidden debuffs get no dispel button.
 
+Languages: English, German, French, Spanish (Spain and Mexico), Russian and Brazilian Portuguese, following your game client.
+
 ## Feedback
 
 Found a bug or have an idea? Click **Feedback** on the options page or type `/btrack feedback` in game to get the link, or go straight to [tylesser.com/feedback](https://tylesser.com/feedback/#bufftracker).

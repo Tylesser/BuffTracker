@@ -11,6 +11,7 @@
 ## X-Website: https://github.com/Tylesser/BuffTracker
 
 Tylesser.lua
+Locales.lua
 Core.lua
 Conditions.lua
 Display.lua

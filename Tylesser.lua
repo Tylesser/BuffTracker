@@ -8,7 +8,38 @@ local T = {}
 ns.T = T
 
 local MEDIA = "Interface\\AddOns\\" .. addonName .. "\\Media\\"
-T.FONT = MEDIA .. "Cinzel-Bold.ttf"
+T.LOCALE = GetLocale and GetLocale() or "enUS"
+-- Cinzel has no Cyrillic (or Korean / Chinese) letters: those clients write the headings in the game's own font.
+local GAME_FONT_LOCALES = { ruRU = true, koKR = true, zhCN = true, zhTW = true }
+T.FONT = GAME_FONT_LOCALES[T.LOCALE] and (STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF") or (MEDIA .. "Cinzel-Bold.ttf")
+
+-- Translations (2026-11-27, the user's request: German, French, Spanish, Russian, Portuguese). Every text is written
+-- in English and read through ns.L: L["Feedback"] is the client's language when a Locales file gave it, else the
+-- English text itself (a missing translation shows English, never nothing). Texts with values keep the placeholders:
+-- L["Next post in %s."]:format(time). Locales files call T.Translations(locale, { [english] = text, ... }); esMX
+-- reads esES, enGB nothing.
+-- A key may carry a context after "##" when one English word needs two translations ("Soft##sound" next to "Soft"
+-- for a glow): the English shown is the part before "##".
+local translated = {}
+ns.L = setmetatable({}, { __index = function(_, key)
+  local text = translated[key]
+  if text then
+    return text
+  end
+  return type(key) == "string" and key:match("^(.-)##") or key
+end })
+local SAME_AS = { esMX = "esES", ptPT = "ptBR" }
+function T.Translations(locale, list)
+  if locale ~= T.LOCALE and locale ~= SAME_AS[T.LOCALE] then
+    return
+  end
+  for english, text in pairs(list) do
+    if type(english) == "string" and type(text) == "string" and text ~= "" then
+      translated[english] = text
+    end
+  end
+end
+local L = ns.L
 T.EMBLEM = MEDIA .. "Emblem"
 T.STUD = MEDIA .. "Stud"
 T.STUD_RUBY = MEDIA .. "StudRuby"
@@ -364,7 +395,7 @@ local function CreateLinkWindow()
 
   local hint = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   hint:SetPoint("TOP", box, "BOTTOM", 0, -8)
-  hint:SetText("Press Ctrl+C to copy, then paste it into your browser.")
+  hint:SetText(L["Press Ctrl+C to copy, then paste it into your browser."])
   window:Hide()
   return window
 end
@@ -384,13 +415,13 @@ end
 
 -- Opens the feedback link: bug reports and ideas go to tylesser.com/feedback.
 function T.ShowFeedback()
-  T.ShowLink(T.FEEDBACK_URL, "Found a bug or have an idea? Tell us on the Tylesser feedback page.\n"
-    .. "More Tylesser addons are on tylesser.com.")
+  T.ShowLink(T.FEEDBACK_URL, L["Found a bug or have an idea? Tell us on the Tylesser feedback page."] .. "\n"
+    .. L["More Tylesser addons are on tylesser.com."])
 end
 
 -- Opens the link to all Tylesser addons.
 function T.ShowMoreAddons()
-  T.ShowLink(T.SITE_URL, "All Tylesser addons, with their features and changelogs, are on tylesser.com.")
+  T.ShowLink(T.SITE_URL, L["All Tylesser addons, with their features and changelogs, are on tylesser.com."])
 end
 
 -- Addon compartment ------------------------------------------------------------------------------
@@ -459,12 +490,12 @@ function T.OptionsPage(panel, name, subtitle)
       line:SetPoint("LEFT", tagline, "RIGHT", 8, 0)
     end
   end
-  local feedback = T.Button(panel, 92, 22, "Feedback")
+  local feedback = T.Button(panel, 92, 22, L["Feedback"])
   feedback:SetPoint("TOPRIGHT", -16, -16)
   feedback:SetScript("OnClick", T.ShowFeedback)
   panel.feedbackButton = feedback
 
-  local more = T.Button(panel, 92, 22, "More addons")
+  local more = T.Button(panel, 92, 22, L["More addons"])
   more:SetPoint("TOPRIGHT", feedback, "BOTTOMRIGHT", 0, -6)
   more:SetScript("OnClick", T.ShowMoreAddons)
   panel.moreAddonsButton = more
@@ -478,3 +509,45 @@ function T.OptionsPage(panel, name, subtitle)
   text:SetText(subtitle or "")
   return text
 end
+
+-- This file's own texts in the other languages (Locales files of each addon hold the rest).
+T.Translations("deDE", {
+  ["Press Ctrl+C to copy, then paste it into your browser."] = "Mit Strg+C kopieren, dann im Browser einfügen.",
+  ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Einen Fehler gefunden oder eine Idee? Schreib uns auf der Tylesser-Feedbackseite.",
+  ["More Tylesser addons are on tylesser.com."] = "Weitere Tylesser-Addons gibt es auf tylesser.com.",
+  ["All Tylesser addons, with their features and changelogs, are on tylesser.com."] = "Alle Tylesser-Addons mit ihren Funktionen und Änderungen findest du auf tylesser.com.",
+  ["Feedback"] = "Feedback",
+  ["More addons"] = "Mehr Addons",
+})
+T.Translations("frFR", {
+  ["Press Ctrl+C to copy, then paste it into your browser."] = "Ctrl+C pour copier, puis collez-le dans votre navigateur.",
+  ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Un bug ou une idée ? Dites-le-nous sur la page de retours Tylesser.",
+  ["More Tylesser addons are on tylesser.com."] = "D'autres addons Tylesser sur tylesser.com.",
+  ["All Tylesser addons, with their features and changelogs, are on tylesser.com."] = "Tous les addons Tylesser, avec leurs fonctions et leurs nouveautés, sont sur tylesser.com.",
+  ["Feedback"] = "Retours",
+  ["More addons"] = "Autres addons",
+})
+T.Translations("esES", {
+  ["Press Ctrl+C to copy, then paste it into your browser."] = "Pulsa Ctrl+C para copiar y pégalo en tu navegador.",
+  ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "¿Has encontrado un error o tienes una idea? Cuéntanoslo en la página de comentarios de Tylesser.",
+  ["More Tylesser addons are on tylesser.com."] = "Más addons de Tylesser en tylesser.com.",
+  ["All Tylesser addons, with their features and changelogs, are on tylesser.com."] = "Todos los addons de Tylesser, con sus funciones y novedades, están en tylesser.com.",
+  ["Feedback"] = "Comentarios",
+  ["More addons"] = "Más addons",
+})
+T.Translations("ruRU", {
+  ["Press Ctrl+C to copy, then paste it into your browser."] = "Нажмите Ctrl+C, чтобы скопировать, и вставьте в браузер.",
+  ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Нашли ошибку или есть идея? Напишите нам на странице отзывов Tylesser.",
+  ["More Tylesser addons are on tylesser.com."] = "Другие аддоны Tylesser — на tylesser.com.",
+  ["All Tylesser addons, with their features and changelogs, are on tylesser.com."] = "Все аддоны Tylesser с описанием и списком изменений — на tylesser.com.",
+  ["Feedback"] = "Отзыв",
+  ["More addons"] = "Другие аддоны",
+})
+T.Translations("ptBR", {
+  ["Press Ctrl+C to copy, then paste it into your browser."] = "Pressione Ctrl+C para copiar e cole no seu navegador.",
+  ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Encontrou um erro ou tem uma ideia? Conte para nós na página de feedback da Tylesser.",
+  ["More Tylesser addons are on tylesser.com."] = "Mais addons da Tylesser em tylesser.com.",
+  ["All Tylesser addons, with their features and changelogs, are on tylesser.com."] = "Todos os addons da Tylesser, com funções e novidades, estão em tylesser.com.",
+  ["Feedback"] = "Feedback",
+  ["More addons"] = "Mais addons",
+})

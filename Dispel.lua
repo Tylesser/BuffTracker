@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 -- Dispels: a button for each debuff you can remove, next to party frames (Party.lua) and under
 -- your own icon row (here). Click it to cast the dispel on that member, or on yourself.
@@ -68,6 +69,9 @@ ns.DEBUFF_COLORS = {
   Magic = { 0.2, 0.6, 1 }, Curse = { 0.6, 0, 1 }, Disease = { 0.6, 0.4, 0 }, Poison = { 0, 0.6, 0 },
 }
 local OTHER_COLOR = { 0.8, 0, 0 }
+-- The types as the player reads them (the English names above stay the game's keys).
+local DEBUFF_TYPE_LABELS = { Magic = L["Magic"], Curse = L["Curse"], Disease = L["Disease"], Poison = L["Poison"],
+  Bleed = L["Bleed"] }
 
 function ns.DebuffColor(debuffType)
   return ns.DEBUFF_COLORS[debuffType] or OTHER_COLOR
@@ -78,7 +82,8 @@ local function ColoredType(debuffType)
   local function Byte(value)
     return math.floor(value * 255 + 0.5)
   end
-  return string.format("|cff%02x%02x%02x%s|r", Byte(color[1]), Byte(color[2]), Byte(color[3]), debuffType)
+  return string.format("|cff%02x%02x%02x%s|r", Byte(color[1]), Byte(color[2]), Byte(color[3]),
+    DEBUFF_TYPE_LABELS[debuffType] or tostring(debuffType))
 end
 ns.ColoredDebuffType = ColoredType
 
@@ -164,29 +169,32 @@ function ns.RemovableDebuffs(debuffs)
   return bySpell
 end
 
--- Tooltip of a dispel button. who: "You" or the member's name.
+-- Tooltip of a dispel button. who: "You" (yourself) or the member's name.
 function ns.DispelTooltip(owner, spell, who, list)
   GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
   GameTooltip:AddLine(spell.name)
+  local you = who == "You"
   if list and #list > 0 then
     for _, debuff in ipairs(list) do
       if debuff.hidden then
-        GameTooltip:AddLine(string.format("%s %s a debuff you can remove (the game hides which in a fight).", who,
-          who == "You" and "have" or "has"), 1, 1, 1, true)
+        GameTooltip:AddLine(you and L["You have a debuff you can remove (the game hides which in a fight)."]
+          or L["%s has a debuff you can remove (the game hides which in a fight)."]:format(who), 1, 1, 1, true)
+      elseif you then
+        GameTooltip:AddLine(L["You have %s: %s"]:format(ColoredType(debuff.type), debuff.name), 1, 1, 1)
       else
-        GameTooltip:AddLine(string.format("%s %s %s: %s", who, who == "You" and "have" or "has",
-          ColoredType(debuff.type), debuff.name), 1, 1, 1)
+        GameTooltip:AddLine(L["%s has %s: %s"]:format(who, ColoredType(debuff.type), debuff.name), 1, 1, 1)
       end
     end
-    GameTooltip:AddLine("Click to remove it.", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Click to remove it."], 0.6, 0.6, 0.6)
   else
     local types = {}
     for _, debuffType in ipairs(spell.typeList) do
       types[#types + 1] = ColoredType(debuffType)
     end
-    GameTooltip:AddLine("Nothing to remove right now. Removes " .. table.concat(types, ", ") .. ".", 0.6, 0.6, 0.6,
+    GameTooltip:AddLine(L["Nothing to remove right now. Removes %s."]:format(table.concat(types, ", ")), 0.6, 0.6, 0.6,
       true)
   end
+
   GameTooltip:Show()
 end
 

@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 -- The row of icons on screen: centered on an anchor that can be dragged while unlocked, or while
 -- Blizzard's Edit Mode is open.
@@ -86,9 +87,9 @@ end
 
 local function FormatTime(seconds)
   if seconds >= 3600 then
-    return string.format("%dh", math.ceil(seconds / 3600))
+    return L["%dh"]:format(math.ceil(seconds / 3600))
   elseif seconds >= 60 then
-    return string.format("%dm", math.ceil(seconds / 60))
+    return L["%dm"]:format(math.ceil(seconds / 60))
   end
   return string.format("%d", math.ceil(seconds))
 end
@@ -133,7 +134,7 @@ function ns.CreateDisplay()
   anchorLabel = mover:CreateFontString(nil, "OVERLAY")
   ns.T.Font(anchorLabel, 11)
   anchorLabel:SetPoint("BOTTOM", mover, "TOP", 0, 6)
-  anchorLabel:SetText("BUFF TRACKER: DRAG TO MOVE")
+  anchorLabel:SetText(L["BUFF TRACKER: DRAG TO MOVE"])
 
   ApplyPosition()
 
@@ -209,20 +210,20 @@ end
 
 local function ShowClickTooltip(self)
   GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-  GameTooltip:AddLine(self.spellName)
+  GameTooltip:AddLine(self.entry and ns.EntryName(self.entry) or self.spellName)
   local action = self.action
   if action and action.remove then
     local entry = self.entry
-    GameTooltip:AddLine("On, but its rules say not here: "
-      .. (entry and ns.ConditionsText(ns.EntryConditions(entry)) or "?") .. ".", 1, 0.3, 0.3, true)
-    GameTooltip:AddLine("Click to remove it.", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["On, but its rules say not here: %s."]:format(
+      entry and ns.ConditionsText(ns.EntryConditions(entry)) or "?"), 1, 0.3, 0.3, true)
+    GameTooltip:AddLine(L["Click to remove it."], 0.6, 0.6, 0.6)
   elseif action and action.item then
-    local name = ns.ItemName(action.item) or ("item " .. action.item)
-    local where = action.slot == 17 and " on your off-hand weapon" or action.slot and " on your main-hand weapon" or ""
-    GameTooltip:AddLine(string.format("Click to use %s%s (%d left).", name, where, ns.ItemCount(action.item)),
-      0.6, 0.6, 0.6)
+    local name = ns.ItemName(action.item) or L["item %s"]:format(action.item)
+    local text = action.slot == 17 and L["Click to use %s on your off-hand weapon (%d left)."]
+      or action.slot and L["Click to use %s on your main-hand weapon (%d left)."] or L["Click to use %s (%d left)."]
+    GameTooltip:AddLine(text:format(name, ns.ItemCount(action.item)), 0.6, 0.6, 0.6)
   else
-    GameTooltip:AddLine("Click to cast it on yourself.", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Click to cast it on yourself."], 0.6, 0.6, 0.6)
   end
   GameTooltip:Show()
 end
@@ -353,7 +354,7 @@ end
 
 local function UpdateTime(icon)
   if icon.unwanted then
-    icon.time:SetText("remove")
+    icon.time:SetText(L["remove"])
     icon.time:SetTextColor(1, 0.3, 0.3)
     return
   end
@@ -421,8 +422,9 @@ function ns.UpdateDisplay()
       local key = entry.name:lower()
       if not ns.warnedUnwanted[key] then
         ns.warnedUnwanted[key] = true
-        print(ns.PREFIX .. entry.name .. " is on, but its rules say not here ("
-          .. ns.ConditionsText(ns.EntryConditions(entry)):lower() .. "). Click its icon to remove it (out of combat).")
+        print(ns.PREFIX .. L["%s is on, but its rules say not here (%s). Click its icon to remove it (out of combat)."]
+          :format(ns.EntryName(entry), ns.ConditionsText(ns.EntryConditions(entry), true)))
+
       end
     elseif missing then
       ns.SetFrameColor(icon, ns.T.RUBY)

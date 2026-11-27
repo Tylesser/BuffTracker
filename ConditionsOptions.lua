@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 -- The "Where buffs show" window (Conditions.lua has the rules): opened from "Where the row shows" above the tracked
 -- list (the whole row) and from each tracked buff's "Where" button (that buff: its own rules, or the row's).
@@ -49,7 +50,7 @@ local function Build()
   window:SetScript("OnDragStart", window.StartMoving)
   window:SetScript("OnDragStop", window.StopMovingOrSizing)
   ns.T.Stone(window)
-  window.title = ns.T.TitleBar(window, "Where buffs show")
+  window.title = ns.T.TitleBar(window, L["Where buffs show"])
   local close = ns.T.CloseButton(window)
   close:SetPoint("TOPRIGHT", -6, -6)
   if type(UISpecialFrames) == "table" then
@@ -62,14 +63,14 @@ local function Build()
   window.name:SetPoint("RIGHT", -16, 0)
   window.name:SetJustifyH("LEFT")
 
-  window.own = MakeCheck(window, "Its own rules (unticked: the same as the whole row)", function(self)
+  window.own = MakeCheck(window, L["Its own rules (unticked: the same as the whole row)"], function(self)
     if type(Target()) == "table" then
       ns.SetOwnConditions(Target(), self:GetChecked() and true or false)
     end
   end)
   window.own:SetPoint("TOPLEFT", 12, -60)
 
-  local left = ns.T.Heading(window, "Where", 180)
+  local left = ns.T.Heading(window, L["Where"], 180)
   left:SetPoint("TOPLEFT", 16, -90)
   window.places = {}
   local last = left
@@ -86,7 +87,7 @@ local function Build()
   -- dual spec (Conditions.lua ns.TALENTS), under Where; only where the game has two talent groups
   window.talents = {}
   if ns.HasTalentGroups() then
-    local talents = ns.T.Heading(window, "Talents", 180)
+    local talents = ns.T.Heading(window, L["Talents"], 180)
     talents:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -10)
     last = talents
     for _, choice in ipairs(ns.TALENTS) do
@@ -100,7 +101,7 @@ local function Build()
     end
   end
 
-  local right = ns.T.Heading(window, "Group", 180)
+  local right = ns.T.Heading(window, L["Group"], 180)
   right:SetPoint("TOPLEFT", 222, -90)
   window.groups = {}
   last = right
@@ -117,7 +118,7 @@ local function Build()
   -- group role (Conditions.lua ns.ROLES), under Group; only where the game has roles
   window.roles = {}
   if ns.HasRoles() then
-    local roles = ns.T.Heading(window, "Role", 180)
+    local roles = ns.T.Heading(window, L["Role"], 180)
     roles:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -8)
     last = roles
     for _, role in ipairs(ns.ROLES) do
@@ -131,7 +132,7 @@ local function Build()
     end
   end
 
-  local combat = ns.T.Heading(window, "Combat", 180)
+  local combat = ns.T.Heading(window, L["Combat"], 180)
   combat:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -8)
   window.combat = {}
   last = combat
@@ -146,16 +147,15 @@ local function Build()
   end
 
   -- one setting for every buff (Conditions.lua ns.Unwanted): off by default
-  window.warn = MakeCheck(window, "Warn me when a buff with rules is on where they say no", function(self)
+  window.warn = MakeCheck(window, L["Warn me when a buff with rules is on where they say no"], function(self)
     ns.SetWarnUnwanted(self:GetChecked() and true or false)
   end)
   window.warn:SetPoint("BOTTOMLEFT", 12, 32)
   window.warn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:AddLine("Warn me to remove it")
-    GameTooltip:AddLine("A tracked buff with rules (its own or the row's) that is on where they say no shows in the "
-      .. "row with \"remove\" under it, and chat names it once. Click the icon to remove the buff (out of combat). "
-      .. "For all buffs.", 1, 1, 1, true)
+    GameTooltip:AddLine(L["Warn me to remove it"])
+    GameTooltip:AddLine(L["A tracked buff with rules (its own or the row's) that is on where they say no shows in the row with \"remove\" under it, and chat names it once. Click the icon to remove the buff (out of combat). For all buffs."],
+      1, 1, 1, true)
     GameTooltip:Show()
   end)
   window.warn:SetScript("OnLeave", Hide)
@@ -177,7 +177,7 @@ function ns.RefreshConditions()
   local isEntry = type(target) == "table"
   window.own:SetShown(isEntry)
   window.own:SetChecked(isEntry and target.conditions ~= nil)
-  window.name:SetText(isEntry and target.name or "The whole row (every tracked buff without its own rules)")
+  window.name:SetText(isEntry and ns.EntryName(target) or L["The whole row (every tracked buff without its own rules)"])
   local function Ready(check, on)
     check:SetChecked(on)
     check:SetEnabled(editable)
@@ -202,7 +202,7 @@ function ns.RefreshConditions()
   end
   window.warn:SetChecked(ns.db.warnUnwanted and true or false)
   local text = ns.ConditionsText(Conditions())
-  window.summary:SetText(isEntry and not editable and ("Same as the whole row: " .. text) or text)
+  window.summary:SetText(isEntry and not editable and L["Same as the whole row: %s"]:format(text) or text)
 end
 
 -- Opens the window for "row" or a tracked entry, beside `anchor`.
@@ -225,14 +225,15 @@ end
 function ns.ConditionsTooltip(self, target)
   GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
   if target == "row" then
-    GameTooltip:AddLine("Where the row shows")
+    GameTooltip:AddLine(L["Where the row shows"])
     GameTooltip:AddLine(ns.ConditionsText(ns.db.conditions), 1, 1, 1, true)
   else
-    GameTooltip:AddLine("Where " .. target.name .. " shows")
+    GameTooltip:AddLine(L["Where %s shows"]:format(ns.EntryName(target)))
     local text = ns.ConditionsText(ns.EntryConditions(target))
-    GameTooltip:AddLine(target.conditions and text or ("Same as the whole row: " .. text), 1, 1, 1, true)
+    GameTooltip:AddLine(target.conditions and text or L["Same as the whole row: %s"]:format(text), 1, 1, 1, true)
   end
-  GameTooltip:AddLine("On top of Always / When active / When missing. Click to change.", 0.7, 0.7, 0.7, true)
+  GameTooltip:AddLine(L["On top of Always / When active / When missing. Click to change."], 0.7, 0.7, 0.7, true)
+
   GameTooltip:Show()
 end
 ns.HideTooltip = Hide

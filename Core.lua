@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 ns.TITLE = "Tylesser - Buff Tracker"
 ns.PREFIX = ns.T.Prefix("Buff Tracker")
@@ -14,7 +15,7 @@ ns.defaults = {
 
 -- Icon shapes, in the order the options button cycles through them.
 ns.SHAPES = { "square", "circle" }
-ns.SHAPE_LABELS = { square = "Square", circle = "Circle" }
+ns.SHAPE_LABELS = { square = L["Square"], circle = L["Circle"] }
 
 ns.MIN_ICON_SIZE = 20
 ns.MAX_ICON_SIZE = 64
@@ -22,7 +23,7 @@ ns.MAX_ICON_SIZE = 64
 -- When a tracked buff is shown. The first is the default for new buffs. "always" dims and marks
 -- it red while it's missing.
 ns.MODES = { "missing", "active", "always" }
-ns.MODE_LABELS = { always = "Always", active = "When active", missing = "When missing" }
+ns.MODE_LABELS = { always = L["Always"], active = L["When active"], missing = L["When missing"] }
 
 local MAX_BUFFS = 40
 
@@ -244,6 +245,13 @@ end
 -- GetWeaponEnchantInfo. 16 = main hand, 17 = off hand.
 ns.WEAPON_SLOTS = { 16, 17 }
 ns.WEAPON_NAMES = { [16] = "Main-hand weapon enchant", [17] = "Off-hand weapon enchant" }
+-- (the names above are the entries' saved keys; this is what the player reads)
+ns.WEAPON_LABELS = { [16] = L["Main-hand weapon enchant"], [17] = L["Off-hand weapon enchant"] }
+
+-- An entry's name as shown: a buff's own name, or a weapon enchant entry's in the client's language.
+function ns.EntryName(entry)
+  return entry.slot and ns.WEAPON_LABELS[entry.slot] or entry.name
+end
 
 -- { [16] = { active, expires, count }, [17] = ... }, or nil when the game doesn't tell.
 local function ReadWeapons()
@@ -655,18 +663,18 @@ end
 function ns.AddBuff(input, icon)
   input = strtrim(tostring(input or ""))
   if input == "" then
-    return nil, "type a buff name or spell ID."
+    return nil, L["type a buff name or spell ID."]
   end
   local id = tonumber(input)
   local name, spellIcon = SpellInfo(id or input)
   if not name then
     if id then
-      return nil, "no spell with the ID " .. input .. "."
+      return nil, L["no spell with the ID %s."]:format(input)
     end
     name = input
   end
   if ns.IsTracked(name) then
-    return nil, name .. " is already tracked."
+    return nil, L["%s is already tracked."]:format(name)
   end
   local entry = { name = name, icon = icon or spellIcon, mode = ns.MODES[1] }
   table.insert(ns.db.tracked, entry)
@@ -778,8 +786,8 @@ local function BlessingChoices()
   if chosen then
     list[#list + 1] = chosen.spells[#chosen.spells].name
   end
-  list[#list + 1] = "Blessing of Wisdom"
-  list[#list + 1] = "Blessing of Might"
+  list[#list + 1] = ns.LocalSpell("Blessing of Wisdom")
+  list[#list + 1] = ns.LocalSpell("Blessing of Might")
   return list
 end
 
@@ -796,7 +804,12 @@ function ns.PresetBuffs()
     if item == "blessing" then
       choices = BlessingChoices()
     elseif type(item) == "string" then
-      choices = { item }
+      choices = { ns.LocalSpell(item) }
+    else
+      choices = {}
+      for i, name in ipairs(item) do
+        choices[i] = ns.LocalSpell(name) -- the client's own names (2026-11-27)
+      end
     end
     local tracked = false
     for _, name in ipairs(choices) do
@@ -817,11 +830,11 @@ end
 function ns.AddPreset()
   local list = ns.PresetBuffs()
   if not list then
-    print(ns.PREFIX .. "there are no basics for your class yet.")
+    print(ns.PREFIX .. L["there are no basics for your class yet."])
     return
   end
   if #list == 0 then
-    print(ns.PREFIX .. "nothing to add: you already track the basic buffs you know.")
+    print(ns.PREFIX .. L["nothing to add: you already track the basic buffs you know."])
     return
   end
   local added = {}
@@ -831,5 +844,6 @@ function ns.AddPreset()
       added[#added + 1] = entry.name
     end
   end
-  print(ns.PREFIX .. "added " .. table.concat(added, ", ") .. ".")
+  print(ns.PREFIX .. L["added %s."]:format(table.concat(added, ", ")))
+
 end

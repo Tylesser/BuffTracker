@@ -1,4 +1,5 @@
 local _, ns = ...
+local L = ns.L
 
 -- Conditions: where and when the tracked buffs show (the user's request, 2026-11-20: "sometimes I don't want to see
 -- my tracked buffs, like in dungeons, in raids; but out of a dungeon in a party I may want to"). On top of each
@@ -21,34 +22,36 @@ local _, ns = ...
 -- unlocked (moving it, Edit Mode) every icon shows, as before. The icons are plain frames, so they may change in a
 -- fight; the click-to-cast overlays are secure and only follow out of combat.
 
+-- label: the check box; text: the same in the summary ("not in <text>", "not <text>", "only <text>"), written for
+-- that place in a sentence (translations use the case the sentence needs there).
 ns.PLACES = {
-  { key = "world", label = "Open world" },
-  { key = "rest", label = "Cities and inns" },
-  { key = "dungeon", label = "Dungeons" },
-  { key = "raid", label = "Raids" },
-  { key = "pvp", label = "Battlegrounds and arenas" },
+  { key = "world", label = L["Open world"], text = L["open world"] },
+  { key = "rest", label = L["Cities and inns"], text = L["cities and inns"] },
+  { key = "dungeon", label = L["Dungeons"], text = L["dungeons"] },
+  { key = "raid", label = L["Raids"], text = L["raids"] },
+  { key = "pvp", label = L["Battlegrounds and arenas"], text = L["battlegrounds and arenas"] },
 }
 ns.GROUPS = {
-  { key = "solo", label = "Solo" },
-  { key = "party", label = "In a party" },
-  { key = "raid", label = "In a raid group" },
+  { key = "solo", label = L["Solo"], text = L["solo"] },
+  { key = "party", label = L["In a party"], text = L["in a party"] },
+  { key = "raid", label = L["In a raid group"], text = L["in a raid group"] },
 }
 ns.COMBAT = {
-  { key = "any", label = "In and out of combat" },
-  { key = "in", label = "Only in combat" },
-  { key = "out", label = "Only out of combat" },
+  { key = "any", label = L["In and out of combat"] },
+  { key = "in", label = L["Only in combat"] },
+  { key = "out", label = L["Only out of combat"] },
 }
 
 ns.TALENTS = {
-  { key = "primary", label = "Primary talents" },
-  { key = "secondary", label = "Secondary talents" },
+  { key = "primary", label = L["Primary talents"] },
+  { key = "secondary", label = L["Secondary talents"] },
 }
 
 ns.ROLES = {
-  { key = "tank", label = "Tank", text = "as tank" },
-  { key = "healer", label = "Healer", text = "as healer" },
-  { key = "damage", label = "Damage", text = "as damage" },
-  { key = "none", label = "No role set", text = "with no role set" },
+  { key = "tank", label = L["Tank"], text = L["as tank"] },
+  { key = "healer", label = L["Healer"], text = L["as healer"] },
+  { key = "damage", label = L["Damage"], text = L["as damage"] },
+  { key = "none", label = L["No role set"], text = L["with no role set"] },
 }
 local ROLE_KEYS = { TANK = "tank", HEALER = "healer", DAMAGER = "damage", NONE = "none" }
 
@@ -184,7 +187,7 @@ function ns.Unwanted(entry, state)
     return false
   end
   local conditions = ns.EntryConditions(entry)
-  if type(conditions) ~= "table" or ns.ConditionsText(conditions) == "Everywhere" or ns.ConditionsMet(conditions) then
+  if type(conditions) ~= "table" or ns.ConditionsText(conditions) == L["Everywhere"] or ns.ConditionsMet(conditions) then
     return false
   end
   return state and state.known and state.active and true or false
@@ -231,44 +234,62 @@ function ns.CopyConditions(conditions)
   return copy
 end
 
--- "Everywhere", or what's left out: "Not in dungeons and raids; only out of combat".
-function ns.ConditionsText(conditions)
+-- "a, b and c" / "a, b or c": lastTwo is L["%s and %s"] or L["%s or %s"].
+local function JoinList(items, lastTwo)
+  if #items < 2 then
+    return items[1]
+  end
+  return lastTwo:format(table.concat(items, ", ", 1, #items - 1), items[#items])
+end
+
+-- The first letter in capitals; also a Cyrillic one (string.upper only knows A-Z).
+local function Capitalize(text)
+  local first, second = text:byte(1, 2)
+  if first == 0xD0 and second and second >= 0xB0 and second <= 0xBF then -- а-п
+    return string.char(0xD0, second - 0x20) .. text:sub(3)
+  elseif first == 0xD1 and second and second >= 0x80 and second <= 0x8F then -- р-я
+    return string.char(0xD0, second + 0x20) .. text:sub(3)
+  end
+  return text:sub(1, 1):upper() .. text:sub(2)
+end
+
+-- "Everywhere", or what's left out: "Not in dungeons and raids; only out of combat". inSentence: no capital
+-- first letter (for a chat line that quotes it).
+function ns.ConditionsText(conditions, inSentence)
   if type(conditions) ~= "table" then
-    return "Everywhere"
+    return L["Everywhere"]
   end
   local parts = {}
   local places = {}
   for _, place in ipairs(ns.PLACES) do
     if conditions.places and conditions.places[place.key] == false then
-      places[#places + 1] = place.label:lower()
+      places[#places + 1] = place.text
     end
   end
   if #places == #ns.PLACES then
-    parts[#parts + 1] = "nowhere"
+    parts[#parts + 1] = L["nowhere"]
   elseif #places > 0 then
-    parts[#parts + 1] = "not in " .. (#places > 1 and table.concat(places, ", ", 1, #places - 1) .. " and "
-      .. places[#places] or places[1])
+    parts[#parts + 1] = L["not in %s"]:format(JoinList(places, L["%s and %s"]))
   end
   local groups = {}
   for _, group in ipairs(ns.GROUPS) do
     if conditions.groups and conditions.groups[group.key] == false then
-      groups[#groups + 1] = group.label:lower()
+      groups[#groups + 1] = group.text
     end
   end
   if #groups == #ns.GROUPS then
-    parts[#parts + 1] = "never in any group"
+    parts[#parts + 1] = L["never in any group"]
   elseif #groups > 0 then
-    parts[#parts + 1] = "not " .. (#groups > 1 and table.concat(groups, ", ", 1, #groups - 1) .. " or "
-      .. groups[#groups] or groups[1])
+    parts[#parts + 1] = L["not %s"]:format(JoinList(groups, L["%s or %s"]))
   end
   if conditions.talents and ns.HasTalentGroups() then
     local primary, secondary = conditions.talents.primary ~= false, conditions.talents.secondary ~= false
     if not primary and not secondary then
-      parts[#parts + 1] = "never with either talents"
+      parts[#parts + 1] = L["never with either talents"]
     elseif not primary then
-      parts[#parts + 1] = "only with secondary talents"
+      parts[#parts + 1] = L["only with secondary talents"]
     elseif not secondary then
-      parts[#parts + 1] = "only with primary talents"
+      parts[#parts + 1] = L["only with primary talents"]
     end
   end
   if conditions.roles and ns.HasRoles() then
@@ -279,23 +300,23 @@ function ns.ConditionsText(conditions)
       end
     end
     if #shown == 0 then
-      parts[#parts + 1] = "never with any role"
+      parts[#parts + 1] = L["never with any role"]
     elseif #shown < #ns.ROLES then
-      parts[#parts + 1] = "only " .. (#shown > 1 and table.concat(shown, ", ", 1, #shown - 1) .. " or "
-        .. shown[#shown] or shown[1])
+      parts[#parts + 1] = L["only %s"]:format(JoinList(shown, L["%s or %s"]))
     end
   end
   if conditions.combat == "in" then
-    parts[#parts + 1] = "only in combat"
+    parts[#parts + 1] = L["only in combat"]
   elseif conditions.combat == "out" then
-    parts[#parts + 1] = "only out of combat"
+    parts[#parts + 1] = L["only out of combat"]
   end
   if #parts == 0 then
-    return "Everywhere"
+    return L["Everywhere"]
   end
   local text = table.concat(parts, "; ")
-  return text:sub(1, 1):upper() .. text:sub(2)
+  return inSentence and text or Capitalize(text)
 end
+
 
 -- Sets one condition. `target` = "row" or a tracked entry; kind = "place" / "group" / "talents" / "role" /
 -- "combat"; for place, group, talents and role,
