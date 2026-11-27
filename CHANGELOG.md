@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.1
+
+- Dispels: **debuffs now show in combat too**. In a fight WoW Forever hides a debuff's name and type from addons, so no dispel button lit up and no icon appeared. Now the game is asked which debuffs you can remove: if you know one dispel, its button lights up as before (with the spell's icon) and an icon appears where no button was; if you know several, an icon with your dispel's icon shows (not clickable, since the game doesn't say which spell fits).
+
 ## 1.11.0
 
 - New: **your group role in "Where buffs show"**. Show a tracked buff only as tank, healer or damage, or with no role set (where the game has group roles). A role change updates the row.

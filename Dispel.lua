@@ -115,12 +115,43 @@ local function SpellForType(debuffType)
   end
 end
 
+-- A debuff the game hides in a fight but says you can remove (ns.ReadDebuffs' { hidden = true }): its type is
+-- unknown, so with one dispel it is that spell's (the button made before the fight lights up and works), and with
+-- several it goes to ns.ANY_DISPEL, which only ever gets a plain combat icon (a click could cast the wrong spell).
+ns.ANY_DISPEL = { name = "Dispel", any = true, types = {}, typeList = {} }
+
+-- The spell whose range and mana the "any" icon shows: your first dispel.
+function ns.DispelSpellFor(spell)
+  if spell and spell.any then
+    return ns.DispelSpells()[1] or spell
+  end
+  return spell
+end
+
+-- The icon for a debuff on a button or combat icon: its own, else (hidden in a fight) the dispel spell's.
+function ns.DebuffIcon(spell, debuff)
+  if debuff and debuff.icon then
+    return debuff.icon
+  end
+  local name = ns.DispelSpellFor(spell)
+  name = name and name.name
+  local icon = name and ((C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(name))
+    or (GetSpellTexture and GetSpellTexture(name)))
+  return icon or ns.DEFAULT_ICON
+end
+
 -- debuffs (from ns.ReadDebuffs with ns.DISPEL_FILTER) -> { [spell] = { debuff, ... } }: what each
 -- of your dispels would remove. A type none of your spells lists gets no button.
 function ns.RemovableDebuffs(debuffs)
   local bySpell = {}
+  local spells = ns.DispelSpells()
   for _, debuff in ipairs(debuffs or {}) do
-    local spell = SpellForType(debuff.type)
+    local spell
+    if debuff.hidden then
+      spell = #spells == 1 and spells[1] or (#spells > 1 and ns.ANY_DISPEL) or nil
+    else
+      spell = SpellForType(debuff.type)
+    end
     if spell then
       local list = bySpell[spell]
       if not list then
@@ -139,8 +170,13 @@ function ns.DispelTooltip(owner, spell, who, list)
   GameTooltip:AddLine(spell.name)
   if list and #list > 0 then
     for _, debuff in ipairs(list) do
-      GameTooltip:AddLine(string.format("%s %s %s: %s", who, who == "You" and "have" or "has",
-        ColoredType(debuff.type), debuff.name), 1, 1, 1)
+      if debuff.hidden then
+        GameTooltip:AddLine(string.format("%s %s a debuff you can remove (the game hides which in a fight).", who,
+          who == "You" and "have" or "has"), 1, 1, 1, true)
+      else
+        GameTooltip:AddLine(string.format("%s %s %s: %s", who, who == "You" and "have" or "has",
+          ColoredType(debuff.type), debuff.name), 1, 1, 1)
+      end
     end
     GameTooltip:AddLine("Click to remove it.", 0.6, 0.6, 0.6)
   else
@@ -207,9 +243,9 @@ end
 -- Icon and colors of a button or combat icon for the first debuff it removes: allowed in combat.
 local function DispelArt(frame, spell, list)
   local debuff = list[1]
-  frame.icon:SetTexture(debuff.icon or ns.DEFAULT_ICON)
+  frame.icon:SetTexture(ns.DebuffIcon(spell, debuff))
   ns.SetFrameColor(frame, ns.DebuffColor(debuff.type))
-  local _, noMana = IsUsable(spell.name)
+  local _, noMana = IsUsable(ns.DispelSpellFor(spell).name)
   if noMana then
     frame.icon:SetVertexColor(0.4, 0.4, 1)
   else
@@ -297,6 +333,22 @@ function ns.UpdateSelfDispel()
           icon.count:SetText(#list > 1 and tostring(#list) or "")
         end
       end
+      -- debuffs hidden in the fight that one of several dispels removes: one icon after the others
+      local hidden = selfRemovable[ns.ANY_DISPEL]
+      if hidden then
+        used = used + 1
+        local icon = GetSelfIcon(used)
+        icon.spell = ns.ANY_DISPEL
+        local px, py = Spot(#spells + 1)
+        if not (icon:IsShown() and icon.px == px and icon.py == py and icon.size == size) then
+          icon.px, icon.py, icon.size = px, py, size
+          PlaceSelf(icon, anchor, px, py, size)
+          icon:Show()
+        end
+        ns.ApplyShape(icon, ns.IsRound())
+        DispelArt(icon, ns.ANY_DISPEL, hidden)
+        icon.count:SetText(#hidden > 1 and tostring(#hidden) or "")
+      end
     end
     HideSelfIcons(used)
   else
@@ -342,7 +394,7 @@ function ns.SelfDispelDebug()
   end
   for spell, list in pairs(selfRemovable) do
     for _, debuff in ipairs(list) do
-      names[#names + 1] = debuff.name .. " (" .. debuff.type .. ", " .. spell.name .. ")"
+      names[#names + 1] = (debuff.name or "hidden") .. " (" .. (debuff.type or "?") .. ", " .. spell.name .. ")"
     end
   end
   table.sort(names)

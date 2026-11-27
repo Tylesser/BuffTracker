@@ -148,6 +148,14 @@ Shared conventions, release steps and the game client are in the workspace file 
 - Alerts depend on reading buffs in combat. While `ReadBuffs` can't (secret values) a drop isn't seen, so no alert.
 - Party buttons are secure: never call Show, Hide, SetPoint or SetAttribute on them in combat
   (`InCombatLockdown()`). `ns.UpdateParty` only recolors in combat and lays out again on `PLAYER_REGEN_ENABLED`.
+- **Hidden debuffs in combat (2026-11-27, the user's screenshot: no dispel icon in a fight):** on Forever a debuff's
+  `name` / `dispelName` are secret in a fight, so `ReadDebuffs` skipped every one. Now, when anything was hidden (index
+  secret, aura table / name / type secret, or `ShouldAurasBeSecret`), `C_UnitAuras.GetUnitAuraInstanceIDs(unit,
+  "HARMFUL|RAID")` (plain IDs; "RAID" + HARMFUL = what the player can dispel, forever AuraUtil.AuraFilters) adds a
+  `{ hidden = true }` per ID not read (readable ones by `auraInstanceID`). `RemovableDebuffs`: hidden -> the only known
+  dispel, or `ns.ANY_DISPEL` with several (a combat icon after the others, never a lit button: the spell is unknown;
+  `ns.DispelSpellFor` gives range/mana from the first dispel). Icons for hidden ones = the spell's (`ns.DebuffIcon`);
+  nothing secret is kept. Tooltip and debug lines cope with no name/type. Tests: `codex_buffs_test` "hidden:".
 - Dispels matter in combat, when buttons can't appear. A needed dispel without a shown button then gets a plain
   **combat icon**: `ns.NewDispelIcon()` (Party.lua: a `Frame` on UIParent with the button look from the shared `Dress`,
   `EnableMouse(false)` so clicks fall through, a small `count` text, `combatDispel = true`; `unit`/`spell` set when

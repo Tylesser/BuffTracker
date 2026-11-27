@@ -144,26 +144,65 @@ end
 -- The unit's debuffs that have a type (Magic, Curse, Disease, Poison): { name, icon, type, count,
 -- expires }. filter is "HARMFUL", or "HARMFUL|RAID" for only those the game says you can remove.
 -- Debuffs the game hides are left out, with the same checks as ReadBuffs.
+-- Debuffs the game hides (in a fight on Forever their name and type are secret: the user's "in combat dispel not
+-- appear even just an icon", 2026-11-27) are still counted when the game says you can remove them: the "RAID" filter
+-- with "HARMFUL" = harmful auras the player can dispel (forever AuraUtil.AuraFilters; AuraUtil uses "HARMFUL|RAID"
+-- for its own dispel display), and C_UnitAuras.GetUnitAuraInstanceIDs returns plain instance IDs (no secret
+-- contents, forever UnitAuraDocumentation). Each such debuff not read above is added as { hidden = true } with no
+-- name, type or icon: nothing secret is ever kept, compared or shown.
+local HIDDEN_FILTER = "HARMFUL|RAID"
+
+local function HiddenDispellable(unit, seen, debuffs)
+  local api = C_UnitAuras
+  if not (api and api.GetUnitAuraInstanceIDs) then
+    return
+  end
+  local ok, ids = pcall(api.GetUnitAuraInstanceIDs, unit, HIDDEN_FILTER)
+  if not ok or type(ids) ~= "table" or IsSecret(ids) then
+    return
+  end
+  for _, id in ipairs(ids) do
+    if not IsSecret(id) and not seen[id] then
+      debuffs[#debuffs + 1] = { hidden = true, count = 0, expires = 0 }
+    end
+  end
+end
+
 function ns.ReadDebuffs(unit, filter)
   local debuffs = {}
   if C_Secrets and C_Secrets.ShouldAurasBeSecret and C_Secrets.ShouldAurasBeSecret() then
+    HiddenDispellable(unit, {}, debuffs)
     return debuffs
   end
+  local seen, someHidden = {}, false
   for index = 1, MAX_BUFFS do
     local hidden = false
     if C_Secrets and C_Secrets.ShouldUnitAuraIndexBeSecret then
       -- pcall: only "HELPFUL" is known to work here; the values themselves are checked below anyway
       local ok, secret = pcall(C_Secrets.ShouldUnitAuraIndexBeSecret, unit, index, filter)
-      hidden = ok and secret or false
+      hidden = ok and secret == true or false
     end
-    if not hidden then
+    if hidden then
+      someHidden = true
+    else
       local aura = GetDebuff(unit, index, filter)
       if not aura then
         break
       end
-      if not (IsSecret(aura) or (canaccesstable and not canaccesstable(aura)) or IsSecret(aura.name)) then
+      if IsSecret(aura) or (canaccesstable and not canaccesstable(aura)) or IsSecret(aura.name) then
+        someHidden = true
+      else
+        local id = Plain(aura.auraInstanceID)
+        if id ~= nil then
+          seen[id] = true
+        end
         local debuffType = Plain(aura.dispelName)
-        if type(debuffType) == "string" and debuffType ~= "" then
+        if IsSecret(aura.dispelName) then
+          someHidden = true -- (a readable name with a secret type: counted by the filter below)
+          if id ~= nil then
+            seen[id] = nil
+          end
+        elseif type(debuffType) == "string" and debuffType ~= "" then
           debuffs[#debuffs + 1] = {
             name = aura.name,
             icon = Plain(aura.icon),
@@ -174,6 +213,9 @@ function ns.ReadDebuffs(unit, filter)
         end
       end
     end
+  end
+  if someHidden then
+    HiddenDispellable(unit, seen, debuffs)
   end
   return debuffs
 end

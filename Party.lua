@@ -1187,10 +1187,11 @@ end
 
 local function CombatIconLooks(icon, unit, spell, list)
   local debuff = list[1]
-  icon.icon:SetTexture(debuff.icon or SpellIcon(spell.name) or ns.DEFAULT_ICON)
+  local cast = ns.DispelSpellFor(spell) -- (a hidden debuff with several dispels: range and mana of your first)
+  icon.icon:SetTexture(debuff.icon or SpellIcon(cast.name) or ns.DEFAULT_ICON)
   ns.SetFrameColor(icon, ns.DebuffColor(debuff.type))
-  local _, noMana = IsUsable(spell.name)
-  if not InRange(spell.name, unit) then
+  local _, noMana = IsUsable(cast.name)
+  if not InRange(cast.name, unit) then
     icon.icon:SetVertexColor(1, 0.3, 0.3)
   elseif noMana then
     icon.icon:SetVertexColor(0.4, 0.4, 1)
@@ -1231,7 +1232,16 @@ local function UpdateCombatIcons(units, raid)
       local side = SideOf(frame, raid)
       local previous = RowEnd(unit, frame, raid)
       local count = 0
-      for _, spell in ipairs(spells) do
+      local order = spells
+      if list[ns.ANY_DISPEL] then
+        -- debuffs hidden in the fight that one of several dispels removes: an icon after the others
+        order = {}
+        for index, spell in ipairs(spells) do
+          order[index] = spell
+        end
+        order[#order + 1] = ns.ANY_DISPEL
+      end
+      for _, spell in ipairs(order) do
         if list[spell] and count < limit and not HasDispelButton(unit, spell, frame, raid) then
           count = count + 1
           local icon = GetCombatIcon(unit, count)
@@ -1552,7 +1562,7 @@ function ns.PartyDebug()
       local debuffs = {}
       for spell, list in pairs(removable[unit] or {}) do
         for _, debuff in ipairs(list) do
-          debuffs[#debuffs + 1] = debuff.name .. " (" .. debuff.type .. ", " .. spell.name .. ")"
+          debuffs[#debuffs + 1] = (debuff.name or "hidden") .. " (" .. (debuff.type or "?") .. ", " .. spell.name .. ")"
         end
       end
       table.sort(debuffs)
