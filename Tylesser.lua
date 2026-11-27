@@ -226,6 +226,26 @@ function T.Heading(parent, text, width)
   return heading
 end
 
+-- A thin line between the groups of an options page (2026-11-28, the user's request: the sections of the settings
+-- ran together): gold in the middle, fading out to both ends. A frame `width` wide and `height` high with the line
+-- across its middle, to anchor the next row under.
+function T.Divider(parent, width, height)
+  local divider = CreateFrame("Frame", nil, parent)
+  divider:SetSize(width or 540, height or 13)
+  local left = divider:CreateTexture(nil, "BORDER")
+  left:SetHeight(1)
+  left:SetPoint("LEFT", divider, "LEFT", 0, 0)
+  left:SetPoint("RIGHT", divider, "CENTER", 0, 0)
+  T.Gradient(left, "HORIZONTAL", T.GOLD_DEEP, T.GOLD_DEEP, 0, 0.7)
+  local right = divider:CreateTexture(nil, "BORDER")
+  right:SetHeight(1)
+  right:SetPoint("LEFT", divider, "CENTER", 0, 0)
+  right:SetPoint("RIGHT", divider, "RIGHT", 0, 0)
+  T.Gradient(right, "HORIZONTAL", T.GOLD_DEEP, T.GOLD_DEEP, 0.7, 0)
+  divider.left, divider.right = left, right
+  return divider
+end
+
 local function ButtonState(button)
   local color = button:IsEnabled() and (button.textColor or T.GOLD) or T.GREY
   button.label:SetTextColor(color[1], color[2], color[3])
@@ -467,7 +487,7 @@ end
 -- Header for an options page (Esc > Options > AddOns): the whole page becomes a runestone panel, with the
 -- emblem medallion, the addon's name and a short line under it. Content starts at T.OPTIONS_TOP.
 T.OPTIONS_TOP = -124
-function T.OptionsPage(panel, name, subtitle)
+function T.OptionsPage(panel, name, subtitle, noVersion)
   T.Stone(panel)
   local emblem = T.Emblem(panel, 44)
   emblem:SetPoint("TOP", 0, -10)
@@ -478,7 +498,7 @@ function T.OptionsPage(panel, name, subtitle)
   local tagline = panel:CreateFontString(nil, "OVERLAY")
   T.Font(tagline, 9, T.MUTED)
   tagline:SetPoint("TOP", title, "BOTTOM", 0, -4)
-  local version = Version()
+  local version = not noVersion and Version()
   tagline:SetText(version and ("TYLESSER  ·  V" .. version) or "TYLESSER")
   for _, side in ipairs({ -1, 1 }) do
     local line = panel:CreateTexture(nil, "BORDER")
@@ -510,8 +530,249 @@ function T.OptionsPage(panel, name, subtitle)
   return text
 end
 
+-- Tylesser's settings window (2026-11-28, the user's requests: one Tylesser entry in Options > AddOns, then "open
+-- Tylesser addons settings on its separate window so you can fit everything"). Every Tylesser addon's options page is
+-- shown in one window of ours, `TylesserSettingsWindow`: the installed addons listed on the left (an addon's own
+-- sub-pages indented under it), the picked page on the right, with room the game's settings canvas didn't have.
+-- Options > AddOns has only a "Tylesser" entry; its page opens that window, and Codex's (T.RegisterLauncher: Codex has a
+-- window of its own). The addons share one table, the global `TylesserSettings` (pages, launchers, window, the game's
+-- category), made by the first Tylesser addon that registers: the one global this file writes.
+--   T.RegisterOptions(panel, title, parent) -> page   (title "Tylesser - <Name>" is listed as "<Name>"; parent = a page)
+--   T.OpenOptions(page)                                  (nil = the first page)
+--   T.RegisterLauncher(label, open)                      (a button on the game's Tylesser page and under the list)
+local WIN_W, WIN_H, LIST_W = 1100, 760, 200
+
+local function Registry()
+  local registry = _G.TylesserSettings
+  if type(registry) ~= "table" then
+    registry = { pages = {}, launchers = {} }
+    _G.TylesserSettings = registry
+  end
+  return registry
+end
+
+local function ShortName(title)
+  return type(title) == "string" and title:match("^Tylesser %- (.+)$") or title
+end
+
+-- The pages in list order: addons by name, each followed by its sub-pages in the order they came.
+local function Ordered()
+  local registry, list = Registry(), {}
+  local tops = {}
+  for _, page in ipairs(registry.pages) do
+    if not page.parent then
+      tops[#tops + 1] = page
+    end
+  end
+  table.sort(tops, function(x, y)
+    return tostring(x.name):lower() < tostring(y.name):lower()
+  end)
+  for _, top in ipairs(tops) do
+    list[#list + 1] = top
+    for _, page in ipairs(registry.pages) do
+      if page.parent == top then
+        list[#list + 1] = page
+      end
+    end
+  end
+  return list
+end
+
+local function SelectPage(window, page)
+  for _, other in ipairs(Registry().pages) do
+    if other ~= page and other.panel then
+      other.panel:Hide()
+    end
+  end
+  window.current = page
+  for _, button in ipairs(window.buttons) do
+    local on = button.page == page
+    button.mark:SetShown(on)
+    if button.label and button.label.SetTextColor then
+      local color = on and T.GOLD or T.PARCHMENT
+      button.label:SetTextColor(color[1], color[2], color[3])
+    end
+  end
+  if page and page.panel then
+    local panel = page.panel
+    panel:SetParent(window.content)
+    panel:ClearAllPoints()
+    panel:SetAllPoints(window.content)
+    panel:Show()
+  end
+end
+
+-- The list on the left (again on each show: an addon may have registered since).
+local function FillList(window)
+  local pages = Ordered()
+  for index, page in ipairs(pages) do
+    local button = window.buttons[index]
+    if not button then
+      button = T.Button(window, LIST_W - 16, 26, "")
+      button.mark = button:CreateTexture(nil, "OVERLAY")
+      button.mark:SetPoint("TOPLEFT", 2, -3)
+      button.mark:SetPoint("BOTTOMLEFT", 2, 3)
+      button.mark:SetWidth(3)
+      button.mark:SetColorTexture(T.GOLD[1], T.GOLD[2], T.GOLD[3], 1)
+      button:SetScript("OnClick", function(self)
+        SelectPage(window, self.page)
+      end)
+      window.buttons[index] = button
+    end
+    local sub = page.parent ~= nil
+    button:ClearAllPoints()
+    button:SetPoint("TOPLEFT", window, "TOPLEFT", sub and 28 or 14, -48 - (index - 1) * 30)
+    button:SetWidth(sub and LIST_W - 30 or LIST_W - 16)
+    button:SetText(page.name)
+    button.page = page
+    button:Show()
+  end
+  for index = #pages + 1, #window.buttons do
+    window.buttons[index]:Hide()
+  end
+  local launchers = Registry().launchers
+  for index, launcher in ipairs(launchers) do
+    local button = window.launchers[index]
+    if not button then
+      button = T.Button(window, LIST_W - 16, 26, "")
+      window.launchers[index] = button
+    end
+    button:ClearAllPoints()
+    button:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", 14, 16 + (#launchers - index) * 30)
+    button:SetText(launcher.label)
+    button:SetScript("OnClick", function()
+      pcall(launcher.open)
+    end)
+    button:Show()
+  end
+  return pages
+end
+
+local function Window()
+  local registry = Registry()
+  if registry.window then
+    return registry.window
+  end
+  local window = CreateFrame("Frame", "TylesserSettingsWindow", UIParent)
+  window:SetSize(WIN_W, WIN_H)
+  window:SetPoint("CENTER")
+  -- the game's settings window's strata, raised over it when opened (T.OpenOptions): the pages' own pop-ups (art
+  -- gallery, pickers, the conditions window, feedback: DIALOG) stay above it (2026-11-28, the user's screenshot)
+  window:SetFrameStrata("HIGH")
+  window:SetToplevel(true)
+  window:SetClampedToScreen(true)
+  window:SetMovable(true)
+  window:EnableMouse(true)
+  window:RegisterForDrag("LeftButton")
+  window:SetScript("OnDragStart", window.StartMoving)
+  window:SetScript("OnDragStop", window.StopMovingOrSizing)
+  T.Stone(window)
+  T.TitleBar(window, "Tylesser")
+  local close = T.CloseButton(window)
+  close:SetPoint("TOPRIGHT", -10, -9)
+  close:SetScript("OnClick", function()
+    window:Hide()
+  end)
+  if UISpecialFrames then
+    table.insert(UISpecialFrames, "TylesserSettingsWindow") -- Esc closes it
+  end
+  local line = window:CreateTexture(nil, "BORDER")
+  line:SetWidth(1)
+  line:SetPoint("TOPLEFT", window, "TOPLEFT", LIST_W + 4, -44)
+  line:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", LIST_W + 4, 14)
+  line:SetColorTexture(T.BRONZE[1], T.BRONZE[2], T.BRONZE[3], 0.8)
+  window.content = CreateFrame("Frame", nil, window)
+  window.content:SetPoint("TOPLEFT", window, "TOPLEFT", LIST_W + 12, -40)
+  window.content:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -10, 10)
+  window.buttons, window.launchers = {}, {}
+  window:SetScript("OnShow", function(self)
+    -- smaller screens: the whole window scaled down to fit
+    local width, height = UIParent:GetWidth() or WIN_W, UIParent:GetHeight() or WIN_H
+    self:SetScale(math.min(1, (width - 20) / WIN_W, (height - 20) / WIN_H))
+    local pages = FillList(self)
+    SelectPage(self, self.wanted or self.current or pages[1])
+    self.wanted = nil
+  end)
+  window:Hide()
+  registry.window = window
+  return window
+end
+
+-- Options > AddOns: the one Tylesser entry, a page with buttons for the window and the launchers.
+local function GamePage()
+  local registry = Registry()
+  if registry.category or not (Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory) then
+    return
+  end
+  local page = CreateFrame("Frame")
+  page.name = "Tylesser"
+  local text = T.OptionsPage(page, "Tylesser",
+    L["Tylesser addons have a settings window of their own, with room for everything."], true)
+  page.buttons = {}
+  page:SetScript("OnShow", function(self)
+    local entries = {}
+    if #registry.pages > 0 then
+      entries[1] = { label = L["Open Tylesser settings"], open = function() T.OpenOptions() end }
+    end
+    for _, launcher in ipairs(registry.launchers) do
+      entries[#entries + 1] = launcher
+    end
+    for index, entry in ipairs(entries) do
+      local button = self.buttons[index]
+      if not button then
+        button = T.Button(self, 240, 26, "", index == 1)
+        button:SetPoint("TOP", text, "BOTTOM", 0, -18 - (index - 1) * 34)
+        self.buttons[index] = button
+      end
+      button:SetText(entry.label)
+      button:SetScript("OnClick", function()
+        pcall(entry.open)
+      end)
+      button:Show()
+    end
+    for index = #entries + 1, #self.buttons do
+      self.buttons[index]:Hide()
+    end
+  end)
+  local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, page, "Tylesser")
+  if ok and category then
+    Settings.RegisterAddOnCategory(category)
+    registry.category = category
+  end
+end
+
+function T.RegisterOptions(panel, title, parent)
+  local registry = Registry()
+  local page = { panel = panel, name = ShortName(title), parent = parent }
+  registry.pages[#registry.pages + 1] = page
+  panel:Hide()
+  pcall(GamePage)
+  return page
+end
+
+function T.RegisterLauncher(label, open)
+  local registry = Registry()
+  registry.launchers[#registry.launchers + 1] = { label = label, open = open }
+  pcall(GamePage)
+end
+
+function T.OpenOptions(page)
+  local window = Window()
+  if window:IsShown() then
+    window.current = nil
+    FillList(window)
+    SelectPage(window, page or Ordered()[1])
+  else
+    window.wanted = page
+    window:Show()
+  end
+  window:Raise()
+end
+
 -- This file's own texts in the other languages (Locales files of each addon hold the rest).
 T.Translations("deDE", {
+  ["Tylesser addons have a settings window of their own, with room for everything."] = "Tylesser-Addons haben ein eigenes Einstellungsfenster, mit Platz für alles.",
+  ["Open Tylesser settings"] = "Tylesser-Einstellungen öffnen",
   ["Press Ctrl+C to copy, then paste it into your browser."] = "Mit Strg+C kopieren, dann im Browser einfügen.",
   ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Einen Fehler gefunden oder eine Idee? Schreib uns auf der Tylesser-Feedbackseite.",
   ["More Tylesser addons are on tylesser.com."] = "Weitere Tylesser-Addons gibt es auf tylesser.com.",
@@ -520,6 +781,8 @@ T.Translations("deDE", {
   ["More addons"] = "Mehr Addons",
 })
 T.Translations("frFR", {
+  ["Tylesser addons have a settings window of their own, with room for everything."] = "Les addons Tylesser ont leur propre fenêtre de réglages, avec de la place pour tout.",
+  ["Open Tylesser settings"] = "Ouvrir les réglages Tylesser",
   ["Press Ctrl+C to copy, then paste it into your browser."] = "Ctrl+C pour copier, puis collez-le dans votre navigateur.",
   ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Un bug ou une idée ? Dites-le-nous sur la page de retours Tylesser.",
   ["More Tylesser addons are on tylesser.com."] = "D'autres addons Tylesser sur tylesser.com.",
@@ -528,6 +791,8 @@ T.Translations("frFR", {
   ["More addons"] = "Autres addons",
 })
 T.Translations("esES", {
+  ["Tylesser addons have a settings window of their own, with room for everything."] = "Los addons de Tylesser tienen su propia ventana de opciones, con sitio para todo.",
+  ["Open Tylesser settings"] = "Abrir las opciones de Tylesser",
   ["Press Ctrl+C to copy, then paste it into your browser."] = "Pulsa Ctrl+C para copiar y pégalo en tu navegador.",
   ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "¿Has encontrado un error o tienes una idea? Cuéntanoslo en la página de comentarios de Tylesser.",
   ["More Tylesser addons are on tylesser.com."] = "Más addons de Tylesser en tylesser.com.",
@@ -536,6 +801,8 @@ T.Translations("esES", {
   ["More addons"] = "Más addons",
 })
 T.Translations("ruRU", {
+  ["Tylesser addons have a settings window of their own, with room for everything."] = "У аддонов Tylesser своё окно настроек, где всё помещается.",
+  ["Open Tylesser settings"] = "Открыть настройки Tylesser",
   ["Press Ctrl+C to copy, then paste it into your browser."] = "Нажмите Ctrl+C, чтобы скопировать, и вставьте в браузер.",
   ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Нашли ошибку или есть идея? Напишите нам на странице отзывов Tylesser.",
   ["More Tylesser addons are on tylesser.com."] = "Другие аддоны Tylesser — на tylesser.com.",
@@ -544,6 +811,8 @@ T.Translations("ruRU", {
   ["More addons"] = "Другие аддоны",
 })
 T.Translations("ptBR", {
+  ["Tylesser addons have a settings window of their own, with room for everything."] = "Os addons da Tylesser têm uma janela de configurações própria, com espaço para tudo.",
+  ["Open Tylesser settings"] = "Abrir as configurações da Tylesser",
   ["Press Ctrl+C to copy, then paste it into your browser."] = "Pressione Ctrl+C para copiar e cole no seu navegador.",
   ["Found a bug or have an idea? Tell us on the Tylesser feedback page."] = "Encontrou um erro ou tem uma ideia? Conte para nós na página de feedback da Tylesser.",
   ["More Tylesser addons are on tylesser.com."] = "Mais addons da Tylesser em tylesser.com.",

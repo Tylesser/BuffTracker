@@ -448,20 +448,10 @@ function ns.CreatePartyOptions()
     ns.RefreshPartyOptions()
   end)
 
-  if ns.optionsCategory and Settings and Settings.RegisterCanvasLayoutSubcategory then
-    ns.partyCategory = Settings.RegisterCanvasLayoutSubcategory(ns.optionsCategory, panel, L["Party buffs"])
-
-  elseif InterfaceOptions_AddCategory then
-    InterfaceOptions_AddCategory(panel)
-  end
+  -- a page under Buff Tracker's in Tylesser's settings window (Tylesser.lua, 2026-11-28)
+  ns.partyCategory = ns.T.RegisterOptions(panel, L["Party buffs"], ns.optionsCategory)
 end
 
 function ns.OpenPartyOptions()
-  if ns.partyCategory and Settings and Settings.OpenToCategory then
-    local id = ns.partyCategory.GetID and ns.partyCategory:GetID() or ns.partyCategory.ID
-    Settings.OpenToCategory(id)
-  elseif panel and InterfaceOptionsFrame_OpenToCategory then
-    InterfaceOptionsFrame_OpenToCategory(panel)
-    InterfaceOptionsFrame_OpenToCategory(panel)
-  end
+  ns.T.OpenOptions(ns.partyCategory)
 end

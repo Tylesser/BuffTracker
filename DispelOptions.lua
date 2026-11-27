@@ -127,20 +127,10 @@ function ns.CreateDispelOptions()
     ns.RefreshDispelOptions()
   end)
 
-  if ns.optionsCategory and Settings and Settings.RegisterCanvasLayoutSubcategory then
-    ns.dispelCategory = Settings.RegisterCanvasLayoutSubcategory(ns.optionsCategory, panel, L["Dispels"])
-
-  elseif InterfaceOptions_AddCategory then
-    InterfaceOptions_AddCategory(panel)
-  end
+  -- a page under Buff Tracker's in Tylesser's settings window (Tylesser.lua, 2026-11-28)
+  ns.dispelCategory = ns.T.RegisterOptions(panel, L["Dispels"], ns.optionsCategory)
 end
 
 function ns.OpenDispelOptions()
-  if ns.dispelCategory and Settings and Settings.OpenToCategory then
-    local id = ns.dispelCategory.GetID and ns.dispelCategory:GetID() or ns.dispelCategory.ID
-    Settings.OpenToCategory(id)
-  elseif panel and InterfaceOptionsFrame_OpenToCategory then
-    InterfaceOptionsFrame_OpenToCategory(panel)
-    InterfaceOptionsFrame_OpenToCategory(panel)
-  end
+  ns.T.OpenOptions(ns.dispelCategory)
 end

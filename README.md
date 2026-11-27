@@ -49,7 +49,7 @@ When a party member is missing one of your group buffs, a small button with the 
 
 **In combat** the game doesn't let addons add, move or remove these buttons. Buttons that are already there keep working, and a buff that lands only dims its button. Everything updates as soon as combat ends.
 
-Turn each group buff on or off and set the blessings at Esc > Options > AddOns > Tylesser - Buff Tracker > Party buffs, or with `/btrack party`.
+Turn each group buff on or off and set the blessings in the Tylesser settings window (Buff Tracker > Party buffs), or with `/btrack party`.
 
 ## Dispel buttons
 
@@ -62,11 +62,11 @@ When a party or raid member has a debuff you can remove, a button with the debuf
 - **In combat:** the game doesn't let addons add or move clickable buttons during a fight. So a debuff that shows up in combat gets a plain icon in the same place instead: the same picture and border color, but it takes no clicks, so a click there reaches the frame under it. Buttons that were there before the fight keep working. After combat the icons go and the buttons come back. Untick **Show dispel icons in combat** on the Dispels page if you'd rather see nothing new during a fight.
 - **Raids too:** in a raid the buttons sit in the top right corner of each raid frame, like the buff buttons, and hide during combat; the plain icons take their place there. Your own row works anywhere, also when you play alone.
 
-Turn either one off at Esc > Options > AddOns > Tylesser - Buff Tracker > Dispels, or with `/btrack dispel`. That page also lists the dispels you know and what each one removes.
+Turn either one off in the Tylesser settings window (Buff Tracker > Dispels), or with `/btrack dispel`. That page also lists the dispels you know and what each one removes.
 
 ## Usage
 
-Type `/btrack` to open the options, go to Esc > Options > AddOns > Tylesser - Buff Tracker, or pick Buff Tracker in the addon menu by the minimap. Click a buff on the right to track it, then use the button next to it to choose when it shows. To move the icons, open Edit Mode (Esc > Edit Mode) and drag the Buff Tracker row, or untick **Lock position** and drag them.
+Type `/btrack` to open the options, open Esc > Options > AddOns > Tylesser > Open Tylesser settings, or pick Buff Tracker in the addon menu by the minimap. Click a buff on the right to track it, then use the button next to it to choose when it shows. To move the icons, open Edit Mode (Esc > Edit Mode) and drag the Buff Tracker row, or untick **Lock position** and drag them.
 
 - `/btrack`: open the options
 - `/btrack party`: open the party buff options (group buffs and blessings)

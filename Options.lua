@@ -405,22 +405,10 @@ function ns.CreateOptions()
     ns.RefreshOptions()
   end)
 
-  if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-    local category = Settings.RegisterCanvasLayoutCategory(panel, ns.TITLE)
-    Settings.RegisterAddOnCategory(category)
-    ns.optionsCategory = category
-  elseif InterfaceOptions_AddCategory then
-    InterfaceOptions_AddCategory(panel)
-  end
+  -- shown in Tylesser's own settings window (Tylesser.lua T.RegisterOptions, 2026-11-28)
+  ns.optionsCategory = ns.T.RegisterOptions(panel, ns.TITLE)
 end
 
 function ns.OpenOptions()
-  if ns.optionsCategory and Settings and Settings.OpenToCategory then
-    local id = ns.optionsCategory.GetID and ns.optionsCategory:GetID() or ns.optionsCategory.ID
-    Settings.OpenToCategory(id)
-  elseif panel and InterfaceOptionsFrame_OpenToCategory then
-    -- called twice: the first call only opens the frame on older clients
-    InterfaceOptionsFrame_OpenToCategory(panel)
-    InterfaceOptionsFrame_OpenToCategory(panel)
-  end
+  ns.T.OpenOptions(ns.optionsCategory)
 end
