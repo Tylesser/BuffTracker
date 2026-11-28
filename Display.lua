@@ -307,6 +307,8 @@ local function LayoutClicks(shown, size)
   for index = used + 1, #clicks do
     clicks[index]:Hide()
   end
+  -- the key for the next missing buff (NextBuff.lua): the same actions, nothing while unlocked
+  ns.LayoutNextBuff(not IsUnlocked() and shown or nil)
 end
 
 local combatFrame = CreateFrame("Frame")
@@ -317,6 +319,7 @@ combatFrame:SetScript("OnEvent", function(_, event)
     -- still allowed while this event runs: the lockdown starts right after it
     if not InCombatLockdown() then
       HideClicks()
+      ns.ClearNextBuff()
     end
     -- "only in combat" / "only out of combat" icons change now; the click overlays stay hidden
     if ns.db then

@@ -17,6 +17,8 @@ Conditions.lua
 Display.lua
 Party.lua
 Dispel.lua
+Share.lua
+NextBuff.lua
 Options.lua
 ConditionsOptions.lua
 PartyOptions.lua

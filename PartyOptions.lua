@@ -11,6 +11,7 @@ local LIST_Y = HEADING_Y - 22
 local LEFT_X, LEFT_WIDTH = 16, 290
 local RIGHT_X, RIGHT_WIDTH = 330, 250
 local CYCLE_WIDTH = 96
+local SHARE_X, SHARE_WIDTH = RIGHT_X + RIGHT_WIDTH + 24, 260 -- a third column: the other paladins (Share.lua)
 
 local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 if select(4, GetBuildInfo()) >= 30000 and select(4, GetBuildInfo()) < 40000 then
@@ -19,7 +20,7 @@ end
 local UNITS = { "player", "party1", "party2", "party3", "party4" }
 
 local panel, enabledCheck, refreshCheck, refreshButton, rangeCheck, rangeButton, allBlessingsCheck, reagentButton
-local raidCheck, resCheck
+local raidCheck, resCheck, shareTitle, shareCheck, shareText
 local buffRows, buffEmpty = {}, nil
 local blessingTitle, blessingEmpty, classRows, memberTitle, memberRows, memberEmpty = nil, nil, {}, nil, {}, nil
 
@@ -243,6 +244,13 @@ local function RefreshBlessings()
     memberRows[index]:Hide()
   end
   memberEmpty:SetShown(known and used <= 1 and not IsInGroup())
+
+  -- the other paladins' blessings (Share.lua)
+  shareTitle:SetShown(known)
+  shareCheck:SetShown(known)
+  shareCheck:SetChecked(ns.db.party.share ~= false)
+  shareText:SetShown(known)
+  shareText:SetText(table.concat(ns.ShareLines(), "\n"))
 end
 
 function ns.RefreshPartyOptions()
@@ -436,6 +444,30 @@ function ns.CreatePartyOptions()
   blessingEmpty:SetText(L["For paladins: choose a blessing for each class and party member."])
 
   memberTitle = ns.T.Heading(panel, L["Party members"], RIGHT_WIDTH)
+
+  shareTitle = ns.T.Heading(panel, L["Other paladins"], SHARE_WIDTH)
+  shareTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", SHARE_X, HEADING_Y)
+  shareCheck = CheckBox(panel, L["Share my blessings"])
+  shareCheck:SetPoint("TOPLEFT", panel, "TOPLEFT", SHARE_X - 2, LIST_Y)
+  shareCheck:SetScript("OnClick", function(self)
+    ns.db.party.share = self:GetChecked() and true or false
+    ns.PartyChanged()
+  end)
+  shareCheck:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(L["Share my blessings"])
+    GameTooltip:AddLine(L["Paladins in your group with Buff Tracker or Codex tell each other their blessing for each class and member. With \"every blessing\" on, a member's buttons leave out a blessing another paladin is giving them, and chat tells you when two of you chose the same one."],
+      1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  shareCheck:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+  shareText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  shareText:SetPoint("TOPLEFT", shareCheck, "BOTTOMLEFT", 2, -6)
+  shareText:SetWidth(SHARE_WIDTH)
+  shareText:SetJustifyH("LEFT")
+  shareText:SetSpacing(2)
 
   memberEmpty = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   memberEmpty:SetPoint("TOPLEFT", memberTitle, "BOTTOMLEFT", 0, -4 - ROW_HEIGHT)

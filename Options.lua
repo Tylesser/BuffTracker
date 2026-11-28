@@ -10,7 +10,10 @@ local LEFT_WIDTH = 270
 local RIGHT_X = 330
 local RIGHT_WIDTH = 240
 
+local KEY_X, KEY_WIDTH = RIGHT_X + RIGHT_WIDTH + 30, 240 -- a third column: the next buff key (NextBuff.lua)
+
 local panel, lockCheck, clickCheck, shapeButton, sizeText, searchBox, searchHint, status, presetButton, rowWhere
+local keyButton
 local trackedList, pickerList
 local spellbook = {}
 
@@ -280,6 +283,7 @@ function ns.RefreshOptions()
   presetButton:SetText(L["Add %s basics"]:format(UnitClass("player") or L["class"]))
   presetButton:SetShown(preset ~= nil)
   presetButton:SetEnabled(preset ~= nil and #preset > 0)
+  keyButton:SetText(ns.NextKeyText(keyButton))
   RefreshTracked()
   RefreshPicker()
 end
@@ -350,6 +354,20 @@ function ns.CreateOptions()
   shapeButton:SetScript("OnClick", function()
     ns.CycleShape()
   end)
+
+  -- one key for the next missing buff (NextBuff.lua)
+  local keyLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  keyLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", KEY_X, top - 4)
+  keyLabel:SetText(L["Key: next missing buff"])
+  keyButton = ns.T.Button(panel, 110, 22, "")
+  keyButton:SetPoint("TOPLEFT", keyLabel, "BOTTOMLEFT", 0, -6)
+  ns.SetupNextKeyButton(keyButton, ns.RefreshOptions)
+  local keyHelp = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  keyHelp:SetPoint("TOPLEFT", keyButton, "BOTTOMLEFT", 0, -6)
+  keyHelp:SetWidth(KEY_WIDTH)
+  keyHelp:SetJustifyH("LEFT")
+  keyHelp:SetText(L["Casts the first missing buff of your icon row on you, or uses its item, like a click on its icon. Out of combat only."]
+    .. " " .. L["In a macro: %s"]:format("/click " .. ns.NEXT_BUTTON_NAME))
 
   local trackedTitle = ns.T.Heading(panel, L["Tracked buffs"], LEFT_WIDTH)
   trackedTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, top - 60)

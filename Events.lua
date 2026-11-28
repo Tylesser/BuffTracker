@@ -33,6 +33,8 @@ local function Setup()
   ns.SetupParty()
   ns.SetupDispel()
   ns.CreateDisplay()
+  ns.ShareSetup() -- blessings shared with the other paladins (Share.lua)
+  ns.ApplyNextKey() -- the next missing buff key (NextBuff.lua)
   ns.CreateOptions()
   ns.CreatePartyOptions()
   ns.CreateDispelOptions()
@@ -70,6 +72,21 @@ eventFrame:SetScript("OnEvent", function(self, event, loadedName)
     print(ns.PREFIX .. L["type %s to choose the buffs to track."]:format("/btrack"))
   end
   ns.Changed()
+end)
+
+-- Blessings shared with the other paladins (Share.lua), and the next buff key after a fight (NextBuff.lua).
+local shareFrame = CreateFrame("Frame")
+for _, event in ipairs(ns.SHARE_EVENTS) do
+  pcall(shareFrame.RegisterEvent, shareFrame, event)
+end
+shareFrame:SetScript("OnEvent", function(_, event, ...)
+  if not ns.db then
+    return
+  end
+  if event == "PLAYER_REGEN_ENABLED" and ns.NextKeyPending() then
+    ns.ApplyNextKey()
+  end
+  ns.ShareEvent(event, ...)
 end)
 
 local sinceTick = 0

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.0
+
+- **Paladins share their blessings**: paladins in your group who use Buff Tracker or Codex tell each other which blessing they give each class and member. The Party buffs page lists the other paladins' choices (the same one as yours in red), chat tells you once when two of you chose the same blessing, and with "every blessing" on a member's buttons leave out a blessing another paladin is giving them. When two of you chose the same one, the paladin whose name comes first in the alphabet keeps it. Untick **Share my blessings** to stop.
+- **One key for the next missing buff**: pick a key on the options page (or put `/click BuffTrackerNextBuff` in a macro) and it casts the first missing buff of your icon row on you, or uses its item, like a click on its icon. Out of combat only.
+
 ## 1.13.0
 
 - **Tylesser settings window**: the options now open in a window of their own with room for everything, every Tylesser addon you have listed on its left. Options > AddOns has one **Tylesser** entry that opens it.

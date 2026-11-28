@@ -665,15 +665,19 @@ local function BlessingsFor(unit)
     return { chosen }, {}
   end
   local chosenTaken = Remaining(unit, chosen) ~= nil
-  if not chosenTaken and HasAnyBlessing(unit) then
+  -- another paladin who shares their choices (Share.lua) is assigned the same one: the one whose name sorts
+  -- first keeps it, the other offers the rest
+  local chosenTheirs = ns.TakenByOther(unit, chosen.key, true)
+  if not chosenTaken and not chosenTheirs and HasAnyBlessing(unit) then
     return { chosen }, {}
   end
   local list, extra = {}, {}
-  if not chosenTaken then
+  if not chosenTaken and not chosenTheirs then
     list[1] = chosen
   end
   for _, family in ipairs(ns.KnownBlessings()) do
-    if family ~= chosen and Remaining(unit, family) == nil then
+    -- (never one another sharing paladin is assigned to give them)
+    if family ~= chosen and Remaining(unit, family) == nil and not ns.TakenByOther(unit, family.key) then
       list[#list + 1] = family
       extra[family] = true
     end
@@ -1482,6 +1486,13 @@ end
 function ns.PartyChanged()
   dirty = true
   ResetSearch()
+  ns.RefreshPartyOptions()
+  ns.ShareChanged() -- the other paladins hear of a new blessing choice (Share.lua)
+end
+
+-- Another paladin's choices arrived (Share.lua): lay out again, without a new frame search.
+function ns.PartyDirty()
+  dirty = true
   ns.RefreshPartyOptions()
 end
 

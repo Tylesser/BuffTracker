@@ -121,6 +121,31 @@ Shared conventions, release steps and the game client are in the workspace file 
   filter)` in Core.lua (typed debuffs only, same secret checks as `ReadBuffs`). In Party.lua dispel slots come after the
   buff buttons in a member's row (so buff buttons never move when dispel slots come and go) (`need.dispel`, `button.dispel`), party and raid (raid buttons on the holder), and `DispelLooks` sets icon (the
   debuff's), border (type color), alpha.
+- `Share.lua` (2026-11-28, the user's request: paladins share blessing assignments like PallyPower; **the same file
+  in Codex's Modules/Buffs**: `ns = root.buffs` when `root.buffs.codex == root`, else root, since Buff Tracker's
+  `ns.buffs` is the player's buff list): prefix `ns.SHARE_PREFIX` "TylesserBless", messages `1:H:CLASS=code,...`
+  (resets the sender), `1:M:Name-Realm=code,...` (group members only), `1:Q`, `1:X`; codes M W K S L Y N (none or
+  not known). Channel RAID / PARTY / INSTANCE_CHAT. Nothing is sent while `InCombatLockdown`, forever
+  `C_ChatInfo.InChatMessagingLockdown` or `AreOutgoingAddonChatMessagesRestricted` (sent at PLAYER_REGEN_ENABLED);
+  CHAT_MSG_ADDON is `SecretInChatMessagingLockdown`, so secret prefix / text / sender are dropped before any compare.
+  Sends only when the state changed (or forced: joining, a new member, a query), coalesced by `Later` (C_Timer).
+  Received from group members only, never yourself (`SameName`: first word of the name, Forever names may carry
+  a surname, plus the realm); `ns.shared[lower Name-Realm] = { full = sender's spelling, name, classes, members }`,
+  forgotten on GROUP_ROSTER_UPDATE when they leave (all when you leave). Party.lua `BlessingsFor` (only with
+  `allBlessings`): extras skip a blessing another sharer gives that member (`ns.TakenByOther(unit, key)`), and the
+  chosen one is given up to a sharer with the same choice whose Name-Realm sorts first (`chosen = true`; both
+  sides decide alike, so exactly one keeps it). `ns.ShareConflicts()` (every class + group members with an own
+  choice on either side), chat once per clash that matters in the group (`WarnConflicts`), `ns.ShareLines()` for
+  the page (third column "Other paladins" in PartyOptions.lua, Codex: under the member list). `party.share` (nil =
+  on, "Share my blessings"). Events from Events.lua's `shareFrame` (`ns.SHARE_EVENTS`); `ns.PartyDirty()` lays out
+  without a new frame search; `ns.PartyChanged()` calls `ns.ShareChanged()`.
+- `NextBuff.lua` (2026-11-28, the same file in Codex): one key for the next missing buff. Hidden secure button
+  `ns.NEXT_BUTTON_NAME` (BuffTrackerNextBuff / CodexBuffsNextBuff, so `/click` works), made the first time there is
+  something to cast or a key; `ns.LayoutNextBuff(shown)` from Display.lua's LayoutClicks (same `ns.ClickAction`
+  as the icon: first shown entry that is known missing, not unwanted, with an action; nil while unlocked),
+  `ns.ClearNextBuff()` at PLAYER_REGEN_DISABLED (the key does nothing in a fight, like the icons). Key `db.nextKey`
+  = override binding (`ns.ApplyNextKey`, waits for combat's end: `ns.NextKeyPending`), picker `ns.SetupNextKeyButton`
+  (Options.lua's third column; Codex: under the size and shape buttons).
 - `Options.lua`: canvas page in Blizzard's settings: tracked buffs on the left (two-line rows: name, "when" and X; then
   the "Use item" cycle button, right-click clears, and the Alert box), buffs, spells and the two weapon enchant entries
   to add on the right, and "Add <class> basics" above the tracked list (hidden for classes without `ns.PRESETS`).
